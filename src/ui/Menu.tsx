@@ -14,7 +14,7 @@ export function Menu({ onGo }: { onGo(d: Destination): void }) {
   return (
     <div className="menu">
       {/* Quieter than the intro: there is a menu to read on top of this one. */}
-      <FloatingPaths position={-1} intensity={0.45} />
+      <FloatingPaths position={-1} count={30} intensity={0.55} />
 
       <header className="menu-head">
         <span className="wordmark" style={{ color: 'var(--paper)' }}>

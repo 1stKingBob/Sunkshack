@@ -38,7 +38,6 @@ export function Intro({ onDone }: Props) {
   return (
     <div className="intro" data-leaving={leaving}>
       <FloatingPaths position={1} />
-      <FloatingPaths position={-1} intensity={0.7} />
 
       <div className="intro-mark">
         <h1 className="intro-word" aria-label="Weave">

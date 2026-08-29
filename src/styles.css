@@ -850,38 +850,37 @@ select { font-family: var(--sans); }
 
 /* ── floating paths background ──────────────────────────────────────────── */
 
-.paths {
+.paths-layer {
   position: absolute;
-  inset: 0;
+  inset: -12%;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.paths {
   width: 100%;
   height: 100%;
-  pointer-events: none;
+  display: block;
 }
 
-/* pathLength="1" normalises every path, so one dash cycle is exactly 1 unit
-   however long the curve really is — which is what lets a single keyframe
-   drive strokes of wildly different lengths at the same visual speed. */
-.paths path {
-  stroke-dasharray: 0.36 0.64;
-  opacity: var(--path-opacity, 0.2);
-  animation-name: path-drift;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-  will-change: stroke-dashoffset;
+/*
+   The perpetual motion is a transform, not a dash offset.
+
+   stroke-dashoffset is a paint property: animating it re-rasterises the whole
+   stroke on the CPU every frame, and at this scale that measured 0.6 fps.
+   A transform is handled by the compositor — the field is painted once and
+   then moved — so this costs effectively nothing no matter how large it is.
+*/
+.paths-drift {
+  will-change: transform;
+  animation: paths-drift 38s ease-in-out infinite alternate;
 }
 
-@keyframes path-drift {
-  0%   { stroke-dashoffset: 1; opacity: calc(var(--path-opacity, 0.2) * 0.45); }
-  50%  { opacity: var(--path-opacity, 0.2); }
-  100% { stroke-dashoffset: 0; opacity: calc(var(--path-opacity, 0.2) * 0.45); }
+@keyframes paths-drift {
+  from { transform: translate3d(-2.5%, -1.5%, 0) scale(1.06); }
+  to   { transform: translate3d(2.5%, 1.5%, 0) scale(1.12); }
 }
 
-/* A background that never stops moving is a real problem for people with
-   vestibular sensitivity. The strokes stay; the drift does not. */
 @media (prefers-reduced-motion: reduce) {
-  .paths path {
-    animation: none;
-    stroke-dasharray: none;
-    opacity: calc(var(--path-opacity, 0.2) * 0.7);
-  }
+  .paths-drift { animation: none; will-change: auto; }
 }

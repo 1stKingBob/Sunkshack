@@ -114,7 +114,10 @@ async function callGemini(
   data: string,
   mediaType: string,
 ): Promise<{ text?: string; error?: string }> {
-  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  // Google retires model aliases fairly aggressively — gemini-2.0-flash was
+  // withdrawn while this was being built. If this 404s, the error body names
+  // the current replacement; set GEMINI_MODEL rather than editing this line.
+  const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
   const r = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {

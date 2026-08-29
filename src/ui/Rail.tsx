@@ -20,7 +20,7 @@ interface Props {
   onDelete(id: string): void;
   onStartPlacing(kind: 'entry' | 'destination' | null): void;
   onDeleteAnchor(id: string): void;
-  onPhoto(file: File): void;
+  onPhotos(files: File[]): void;
   onPreset(which: 'demo' | 'empty'): void;
 }
 
@@ -30,8 +30,11 @@ const QUICK_ADD: FurnitureType[] = [
 
 export function Rail(p: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const [wText, setWText] = useState<string | null>(null);
   const [dText, setDText] = useState<string | null>(null);
+  const [sizeW, setSizeW] = useState<string | null>(null);
+  const [sizeD, setSizeD] = useState<string | null>(null);
 
   const selected = p.room.furniture.find((f) => f.id === p.selectedId) ?? null;
   const spec = selected ? FURNITURE[selected.type] : null;
@@ -46,6 +49,14 @@ export function Rail(p: Props) {
     const clamped = Math.min(30000, Math.max(500, mm));
     if (which === 'w') p.onRoomSize(clamped, p.room.depth);
     else p.onRoomSize(p.room.width, clamped);
+  };
+
+  const commitSize = (which: 'w' | 'd', text: string) => {
+    if (!selected) return;
+    const n = Number(text);
+    if (!Number.isFinite(n) || n <= 0) return;
+    const mm = Math.min(6000, Math.max(50, Math.round(parseToMm(n, p.units))));
+    p.onUpdate(selected.id, which === 'w' ? { width: mm, provenance: 'user' } : { depth: mm, provenance: 'user' });
   };
 
   return (
@@ -105,11 +116,23 @@ export function Rail(p: Props) {
           ref={fileRef}
           type="file"
           accept="image/*"
+          multiple
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            if (files.length) p.onPhotos(files);
+            e.target.value = '';
+          }}
+        />
+        <input
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
           capture="environment"
           style={{ display: 'none' }}
           onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) p.onPhoto(f);
+            const files = Array.from(e.target.files ?? []);
+            if (files.length) p.onPhotos(files);
             e.target.value = '';
           }}
         />
@@ -118,11 +141,20 @@ export function Rail(p: Props) {
           disabled={p.photoBusy}
           onClick={() => fileRef.current?.click()}
         >
-          {p.photoBusy ? 'Reading the room…' : 'Take or upload a photo'}
+          {p.photoBusy ? 'Reading the room…' : 'Upload photos of the room'}
+        </button>
+        <button
+          className="btn wide"
+          style={{ marginTop: 6 }}
+          disabled={p.photoBusy}
+          onClick={() => cameraRef.current?.click()}
+        >
+          Take a photo
         </button>
         <p className="hint">
-          The photo tells us what is in the room and roughly where. It never sets a size —
-          sizes come from the standard table below and are yours to correct.
+          Several angles work better than one — a single frame cannot show what is behind the
+          camera. Up to four are used. The photo tells us what is in the room and roughly where;
+          it never sets a size.
         </p>
         {p.photoNotes.map((n, i) => (
           <p className="hint warn" key={i}>{n}</p>
@@ -183,6 +215,31 @@ export function Rail(p: Props) {
                   Standard {formatLength(spec.width, p.units)} × {formatLength(spec.depth, p.units)}.
                 </p>
               )}
+            </div>
+            <div className="field">
+              <label>Exact size ({unitSuffix(p.units)})</label>
+              <div className="row">
+                <input
+                  type="number"
+                  aria-label="Width"
+                  value={sizeW ?? Math.round(fromMm(selected.width, p.units))}
+                  onChange={(e) => setSizeW(e.target.value)}
+                  onBlur={(e) => { commitSize('w', e.target.value); setSizeW(null); }}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                />
+                <input
+                  type="number"
+                  aria-label="Depth"
+                  value={sizeD ?? Math.round(fromMm(selected.depth, p.units))}
+                  onChange={(e) => setSizeD(e.target.value)}
+                  onBlur={(e) => { commitSize('d', e.target.value); setSizeD(null); }}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                />
+              </div>
+              <p className="hint" style={{ marginTop: 6 }}>
+                Measured it yourself? Type it. A number you measured always beats a standard
+                size we assumed.
+              </p>
             </div>
             <div className="row">
               <button

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { ClearanceResult, Room } from '../types';
+import type { Suggestion } from '../engine/suggest';
 import { footprint } from '../engine/grid';
 import { makeHatchCanvas, PALETTE, PALETTE_HEX } from './palette';
 import { buildWheelchair } from './wheelchair';
@@ -39,10 +40,12 @@ export class RoomScene {
   private furnitureGroup = new THREE.Group();
   private anchorGroup = new THREE.Group();
   private analysisGroup = new THREE.Group();
+  private ghostGroup = new THREE.Group();
   private chair: THREE.Group;
 
   private room: Room | null = null;
   private result: ClearanceResult | null = null;
+  private suggestion: Suggestion | null = null;
   private selectedId: string | null = null;
   private mode: SceneMode = 'select';
   private showChair = true;
@@ -91,7 +94,13 @@ export class RoomScene {
     fill.position.set(-5, 4, -3);
     this.scene.add(fill);
 
-    this.scene.add(this.roomGroup, this.furnitureGroup, this.anchorGroup, this.analysisGroup);
+    this.scene.add(
+      this.roomGroup,
+      this.furnitureGroup,
+      this.anchorGroup,
+      this.analysisGroup,
+      this.ghostGroup,
+    );
 
     this.chair = buildWheelchair();
     this.chair.visible = false;
@@ -134,11 +143,75 @@ export class RoomScene {
     }
     this.refreshFurniture();
     this.refreshAnchors();
+    this.refreshGhost();
   }
 
   setResult(result: ClearanceResult | null) {
     this.result = result;
     this.refreshAnalysis();
+  }
+
+  setSuggestion(s: Suggestion | null) {
+    this.suggestion = s;
+    this.refreshGhost();
+  }
+
+  /**
+   * The suggested position, drawn as a hollow dashed outline rather than a
+   * solid block.
+   *
+   * A suggestion is a proposal, not a fact about the room, and it has to look
+   * like one — a second solid piece of furniture would read as though the
+   * wardrobe had been duplicated. Dashed and empty says "this space would be
+   * occupied" without claiming it already is.
+   */
+  private refreshGhost() {
+    this.ghostGroup.clear();
+    if (!this.room || !this.suggestion) return;
+    const item = this.room.furniture.find((f) => f.id === this.suggestion!.itemId);
+    if (!item) return;
+
+    const s = this.suggestion;
+    const swapped = s.to.rotation === 90 || s.to.rotation === 270;
+    const w = (swapped ? item.depth : item.width) * MM;
+    const d = (swapped ? item.width : item.depth) * MM;
+    const h = Math.max(item.height, 120) * MM;
+    const centre = this.toWorld(s.to.x, s.to.y);
+
+    const col = s.solves ? PALETTE_HEX.emerald : PALETTE_HEX.crimson;
+
+    const outline = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d)),
+      new THREE.LineDashedMaterial({ color: col, dashSize: 0.07, gapSize: 0.05 }),
+    );
+    outline.computeLineDistances();
+    outline.position.set(centre.x, h / 2, centre.z);
+    this.ghostGroup.add(outline);
+
+    const pad = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, d),
+      new THREE.MeshBasicMaterial({
+        color: col,
+        transparent: true,
+        opacity: 0.13,
+        side: THREE.DoubleSide,
+      }),
+    );
+    pad.rotation.x = -Math.PI / 2;
+    pad.position.set(centre.x, 0.02, centre.z);
+    this.ghostGroup.add(pad);
+
+    // A line from where it is to where it would go, so the move is legible.
+    const from = this.toWorld(s.from.x, s.from.y);
+    const link = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(from.x, 0.03, from.z),
+        new THREE.Vector3(centre.x, 0.03, centre.z),
+      ]),
+      new THREE.LineDashedMaterial({ color: col, dashSize: 0.06, gapSize: 0.06 }),
+    );
+    link.computeLineDistances();
+    this.ghostGroup.add(link);
   }
 
   /**

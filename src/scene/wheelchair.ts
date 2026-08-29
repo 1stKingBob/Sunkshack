@@ -11,8 +11,10 @@ import { PALETTE_HEX } from './palette';
 export function buildWheelchair(): THREE.Group {
   const g = new THREE.Group();
 
-  const frame = new THREE.MeshLambertMaterial({ color: PALETTE_HEX.ink });
-  const seatMat = new THREE.MeshLambertMaterial({ color: PALETTE_HEX.timber });
+  // Blue, not ink-and-timber: the chair is the person moving through the room,
+  // not another object sitting in it, and it needs to read that way at a glance.
+  const frame = new THREE.MeshLambertMaterial({ color: PALETTE_HEX.steel });
+  const seatMat = new THREE.MeshLambertMaterial({ color: PALETTE_HEX.sky });
   const tyre = new THREE.MeshLambertMaterial({ color: 0x1a2530 });
 
   // seat

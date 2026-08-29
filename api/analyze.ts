@@ -12,8 +12,10 @@
  */
 
 export interface AnalyzeRequest {
-  /** data URL or bare base64 */
-  image: string;
+  /** data URL or bare base64. Legacy single-photo field. */
+  image?: string;
+  /** Several photographs of the SAME room, from different angles. */
+  images?: string[];
   /** mm — the one real-world measurement we trust, used to scale everything */
   roomWidth: number;
   roomDepth: number;
@@ -54,7 +56,8 @@ Given one photograph of a room, identify the significant floor-standing furnitur
 Rules that matter:
 - Only include furniture that SITS ON THE FLOOR and would obstruct movement. Ignore wall art, curtains, rugs, ceiling lights, and anything on top of another object.
 - Do NOT estimate real-world sizes in metres or feet. You cannot know scale from a single photo, and a wrong size here corrupts the whole measurement. Report a size CATEGORY only where you are confident.
-- fx/fy are positions on a top-down plan, each 0 to 1. fx = 0 is the left wall, fx = 1 the right wall. fy = 0 is the far wall (deepest in the photo), fy = 1 the near wall (closest to the camera). Give the CENTRE of each object.
+- fx/fy are positions on a top-down plan, each 0 to 1. fx = 0 is the left wall, fx = 1 the right wall. fy = 0 is the far wall, fy = 1 the near wall. Give the CENTRE of each object.
+- If you are given SEVERAL photographs, they are all of the SAME room from different angles. Build ONE floor plan covering the whole room. A piece of furniture visible in more than one photo is ONE object and must appear ONCE. Use the extra viewpoints to place things you could not locate confidently from a single angle, and to resolve what is behind or beside what.
 - rotation is 0 if the object's long axis runs left-right in the plan, 90 if it runs near-far.
 - If you cannot work out the layout, return the items with fx and fy omitted rather than guessing.
 
@@ -62,13 +65,29 @@ Return ONLY minified JSON, no prose, no code fence:
 {"items":[{"type":"bed","confidence":0.9,"fx":0.3,"fy":0.4,"rotation":0,"sizeHint":"Queen"}]}
 type must be one of: ${TYPES.join(', ')}`;
 
-const USER_TURN = 'Identify the floor-standing furniture and give the top-down plan positions.';
+const USER_TURN = (n: number) =>
+  n <= 1
+    ? 'Identify the floor-standing furniture and give the top-down plan positions.'
+    : `These are ${n} photographs of the SAME room from different angles. Reconcile them into ONE floor plan — each piece of furniture appears exactly once, however many photos it shows up in.`;
+
+/** Cap the payload: more angles help, but a dozen photos is cost without gain. */
+const MAX_PHOTOS = 4;
+
+function decodePhotos(body: AnalyzeRequest): { data: string; mediaType: string }[] {
+  const raw = body.images?.length ? body.images : body.image ? [body.image] : [];
+  return raw.slice(0, MAX_PHOTOS).map((src) => {
+    const m = /^data:(image\/[a-zA-Z+]+);/.exec(src);
+    return {
+      data: src.includes(',') ? src.split(',')[1] : src,
+      mediaType: m ? m[1] : 'image/jpeg',
+    };
+  });
+}
 
 /** Anthropic Messages API with a base64 image. */
 async function callAnthropic(
   key: string,
-  data: string,
-  mediaType: string,
+  photos: { data: string; mediaType: string }[],
 ): Promise<{ text?: string; error?: string }> {
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -85,8 +104,11 @@ async function callAnthropic(
         {
           role: 'user',
           content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data } },
-            { type: 'text', text: USER_TURN },
+            ...photos.map((p) => ({
+              type: 'image' as const,
+              source: { type: 'base64' as const, media_type: p.mediaType, data: p.data },
+            })),
+            { type: 'text', text: USER_TURN(photos.length) },
           ],
         },
       ],
@@ -111,8 +133,7 @@ async function callAnthropic(
  */
 async function callGemini(
   key: string,
-  data: string,
-  mediaType: string,
+  photos: { data: string; mediaType: string }[],
 ): Promise<{ text?: string; error?: string }> {
   // Google retires model aliases fairly aggressively — gemini-2.0-flash was
   // withdrawn while this was being built. If this 404s, the error body names
@@ -128,7 +149,10 @@ async function callGemini(
         contents: [
           {
             role: 'user',
-            parts: [{ inline_data: { mime_type: mediaType, data } }, { text: USER_TURN }],
+            parts: [
+              ...photos.map((p) => ({ inline_data: { mime_type: p.mediaType, data: p.data } })),
+              { text: USER_TURN(photos.length) },
+            ],
           },
         ],
         generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 1200 },
@@ -166,16 +190,17 @@ export async function analyze(body: AnalyzeRequest): Promise<AnalyzeResponse> {
     };
   }
 
-  const raw = body.image.includes(',') ? body.image.split(',')[1] : body.image;
-  const mediaMatch = /^data:(image\/[a-zA-Z+]+);/.exec(body.image);
-  const mediaType = mediaMatch ? mediaMatch[1] : 'image/jpeg';
+  const photos = decodePhotos(body);
+  if (photos.length === 0) {
+    return { items: [], mode: 'fallback', warnings: ['No image was supplied.'] };
+  }
 
   let text: string;
   try {
     // Anthropic wins if both are set; Gemini is the fallback provider.
     const res = anthropicKey
-      ? await callAnthropic(anthropicKey, raw, mediaType)
-      : await callGemini(geminiKey!, raw, mediaType);
+      ? await callAnthropic(anthropicKey, photos)
+      : await callGemini(geminiKey!, photos);
 
     if (res.error) {
       return { items: [], mode: 'fallback', warnings: [res.error] };
@@ -226,7 +251,11 @@ export async function analyze(body: AnalyzeRequest): Promise<AnalyzeResponse> {
   if (positioned < items.length) {
     warnings.push(`${items.length - positioned} item(s) had no readable position and were placed by heuristic.`);
   }
-  warnings.push('Positions are estimated from one photo and scaled by the width you typed. Drag anything that looks wrong.');
+  warnings.push(
+    photos.length > 1
+      ? `Positions estimated from ${photos.length} photos and scaled by the width you typed. Drag anything that looks wrong.`
+      : 'Positions estimated from one photo and scaled by the width you typed. More angles improve this. Drag anything that looks wrong.',
+  );
 
   return { items, mode: 'calibrated', warnings };
 }
@@ -239,8 +268,8 @@ export default async function handler(req: any, res: any) {
   }
   try {
     const body: AnalyzeRequest = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    if (!body?.image) {
-      res.status(400).json({ error: 'image is required' });
+    if (!body?.image && !body?.images?.length) {
+      res.status(400).json({ error: 'image or images is required' });
       return;
     }
     res.status(200).json(await analyze(body));

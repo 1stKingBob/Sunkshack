@@ -22,14 +22,19 @@ export async function fileToDataUrl(file: File, maxEdge = 1280): Promise<string>
 }
 
 /**
- * Photo in, placed furniture out.
+ * Photos in, placed furniture out.
+ *
+ * Several angles of the same room give the vision model far more to work with
+ * than one: a single frame cannot show what is behind the camera or tucked
+ * beside the door, and the model has to guess. The server reconciles them into
+ * one plan.
  *
  * Never throws. Every failure path — no key, network down, model returns
  * nonsense — lands in the same place: an empty detection list, which the
  * caller turns into "add furniture by hand". A demo that degrades is a demo
  * that survives a hackathon wifi network.
  */
-export async function analysePhoto(dataUrl: string, room: Room): Promise<PipelineOutcome> {
+export async function analysePhotos(dataUrls: string[], room: Room): Promise<PipelineOutcome> {
   let detections: RawDetection[] = [];
   let mode: PipelineOutcome['mode'] = 'fallback';
   let warnings: string[] = [];
@@ -38,7 +43,7 @@ export async function analysePhoto(dataUrl: string, room: Room): Promise<Pipelin
     const res = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ image: dataUrl, roomWidth: room.width, roomDepth: room.depth }),
+      body: JSON.stringify({ images: dataUrls, roomWidth: room.width, roomDepth: room.depth }),
     });
     if (res.ok) {
       const json = await res.json();

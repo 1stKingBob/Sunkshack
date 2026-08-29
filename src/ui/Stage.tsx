@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ClearanceResult, Room } from '../types';
+import type { Suggestion } from '../engine/suggest';
 import { RoomScene, type SceneLabel, type SceneMode } from '../scene/RoomScene';
 
 interface Props {
   room: Room;
   result: ClearanceResult | null;
   selectedId: string | null;
+  suggestion: Suggestion | null;
   mode: SceneMode;
   showWheelchair: boolean;
   onSelect(id: string | null): void;
@@ -43,6 +45,7 @@ export function Stage(props: Props) {
   useEffect(() => { scene.current?.setRoom(props.room); }, [props.room]);
   useEffect(() => { scene.current?.setResult(props.result); }, [props.result]);
   useEffect(() => { scene.current?.setSelected(props.selectedId); }, [props.selectedId]);
+  useEffect(() => { scene.current?.setSuggestion(props.suggestion); }, [props.suggestion]);
   useEffect(() => { scene.current?.setMode(props.mode); }, [props.mode]);
   useEffect(() => { scene.current?.setShowWheelchair(props.showWheelchair); }, [props.showWheelchair]);
 

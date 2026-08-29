@@ -1,0 +1,470 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   COMMUNITY  (map + scores)
+   ══════════════════════════════════════════════════════════════════════════
+
+   Ported from the standalone community app. Every rule is scoped under `.cx`
+   because that app was written to own the whole page: it defines .app,
+   .topbar, .wordmark, .btn, .field and .spacer, all of which already mean
+   something different here. Left unscoped, the two stylesheets would quietly
+   overwrite each other and both screens would be wrong.
+
+   Its :root palette and global resets were dropped rather than scoped — they
+   were an identical copy of ours, and a second declaration of the same tokens
+   is noise, not safety.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* A flex column, not the two-row grid the original used. That grid existed to
+   sit a top bar above the content; this renders inside the main app's shell,
+   which already has one. With the bar removed the page landed in the `auto`
+   row and the empty `1fr` row swallowed two thirds of the screen. */
+.cx {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.cx > .banner {
+  flex: none;
+  margin: 12px 16px 0;
+}
+
+.cx > .map-body,
+.cx > .upload-page {
+  flex: 1;
+  min-height: 0;
+}
+
+
+
+.cx .topbar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 20px;
+  height: 58px;
+  border-bottom: 1px solid var(--ink-15);
+  background: var(--paper-raised);
+}
+
+.cx .wordmark {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.cx .wordmark .glyph {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--ink);
+  transform: translateY(1px);
+}
+
+.cx .wordmark .sub {
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--ink-60);
+  text-transform: none;
+  font-size: 13px;
+}
+
+.cx .spacer { flex: 1;
+}
+
+.cx .btn {
+  border: 1px solid var(--ink-15);
+  background: var(--paper-raised);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  color: inherit;
+  display: inline-block;
+}
+
+.cx .btn:hover { background: var(--paper-sunk);
+}
+
+.cx .btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink);
+}
+
+.cx .btn.primary:hover { opacity: 0.9;
+}
+
+.cx .btn:disabled { opacity: 0.5; cursor: not-allowed;
+}
+
+.cx .btn-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-weight: 600;
+  text-decoration: underline;
+  color: var(--emerald);
+}
+
+.cx .map-body {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  height: 100%;
+  overflow: hidden;
+}
+
+.cx .sidebar {
+  border-right: 1px solid var(--ink-15);
+  background: var(--paper-raised);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.cx .search-panel {
+  padding: 16px;
+  border-bottom: 1px solid var(--ink-15);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cx .search-row {
+  display: flex;
+  gap: 8px;
+}
+
+.cx .search-row input[type='text'] {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid var(--ink-15);
+  border-radius: 8px;
+  background: var(--paper);
+  font-size: 13px;
+}
+
+.cx .filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--ink-60);
+}
+
+.cx .filter-row input[type='range'] { flex: 1;
+}
+
+.cx .filter-row .value {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--ink);
+  min-width: 30px;
+  text-align: right;
+}
+
+.cx .place-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.cx .place-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ink-08);
+  cursor: pointer;
+}
+
+.cx .place-row:hover { background: var(--paper-sunk);
+}
+
+.cx .place-row[data-selected='true'] { background: var(--paper-sunk); border-left: 3px solid var(--emerald);
+}
+
+.cx .place-row-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cx .place-row-name { font-weight: 600; font-size: 13.5px;
+}
+
+.cx .place-row-meta { font-size: 12px; color: var(--ink-60);
+}
+
+.cx .score-pill {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.cx .score-pill[data-tier='good'] { background: rgba(45, 106, 79, 0.14); color: var(--emerald);
+}
+
+.cx .score-pill[data-tier='mid'] { background: rgba(176, 139, 103, 0.2); color: #8a6a4c;
+}
+
+.cx .score-pill[data-tier='bad'] { background: rgba(196, 67, 46, 0.12); color: var(--crimson);
+}
+
+.cx .score-pill[data-tier='none'] { background: var(--ink-08); color: var(--ink-40);
+}
+
+.cx .empty-hint {
+  padding: 24px 16px;
+  color: var(--ink-40);
+  font-size: 13px;
+  text-align: center;
+}
+
+.cx .map-pane { position: relative;
+}
+
+.cx #map-canvas { width: 100%; height: 100%;
+}
+
+.cx .map-status {
+  position: absolute;
+  inset: 12px 12px auto auto;
+  background: var(--paper-raised);
+  border: 1px solid var(--ink-15);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--ink-60);
+  max-width: 320px;
+}
+
+.cx .building-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: 340px;
+  background: var(--paper-raised);
+  border: 1px solid var(--ink-15);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(34, 48, 58, 0.14);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.cx .building-panel-head {
+  padding: 16px;
+  border-bottom: 1px solid var(--ink-15);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cx .building-panel-head h2 { margin: 0; font-size: 16px;
+}
+
+.cx .building-panel-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: var(--ink-40);
+}
+
+.cx .building-panel-body { flex: 1; overflow-y: auto; padding: 12px 16px;
+}
+
+.cx .building-panel-actions { padding: 12px 16px; border-top: 1px solid var(--ink-15);
+}
+
+.cx .report-card {
+  border: 1px solid var(--ink-15);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.cx .report-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+
+.cx .report-card-profile { font-weight: 600; font-size: 12.5px;
+}
+
+.cx .report-check {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--ink-60);
+  padding: 2px 0;
+}
+
+.cx .report-check .v { font-family: var(--mono);
+}
+
+.cx .report-check[data-ok='false'] .v { color: var(--crimson);
+}
+
+.cx .report-check[data-ok='true'] .v { color: var(--emerald);
+}
+
+.cx .report-note { margin-top: 6px; font-size: 12px; color: var(--ink-60); font-style: italic;
+}
+
+.cx .upload-page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.cx .upload-page h1 { margin: 0 0 4px; font-size: 22px;
+}
+
+.cx .upload-page .lede { color: var(--ink-60); margin: 0 0 28px; max-width: 52ch;
+}
+
+.cx .card {
+  background: var(--paper-raised);
+  border: 1px solid var(--ink-15);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.cx .card h3 {
+  margin: 0 0 12px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-60);
+}
+
+.cx .dropzone {
+  border: 1.5px dashed var(--ink-15);
+  border-radius: 10px;
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--ink-60);
+  font-size: 13px;
+}
+
+.cx .dropzone input[type='file'] { display: none;
+}
+
+.cx .score-hero {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.cx .score-hero .num {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 44px;
+  line-height: 1;
+}
+
+.cx .score-hero .of10 { color: var(--ink-40); font-size: 15px;
+}
+
+.cx .field { margin-bottom: 14px;
+}
+
+.cx .field label {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-60);
+  margin-bottom: 6px;
+}
+
+.cx .field input[type='text'], .cx .field textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--ink-15);
+  border-radius: 8px;
+  background: var(--paper);
+  font-size: 13px;
+}
+
+.cx .field textarea { resize: vertical; min-height: 60px;
+}
+
+.cx .autocomplete-wrap { position: relative;
+}
+
+.cx .autocomplete-list {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--paper-raised);
+  border: 1px solid var(--ink-15);
+  border-radius: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  box-shadow: 0 6px 18px rgba(34, 48, 58, 0.12);
+}
+
+.cx .autocomplete-item { padding: 9px 12px; font-size: 13px; cursor: pointer;
+}
+
+.cx .autocomplete-item:hover { background: var(--paper-sunk);
+}
+
+.cx .picked-building {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--emerald);
+  border-radius: 8px;
+  background: rgba(45, 106, 79, 0.08);
+  font-size: 13px;
+}
+
+.cx .banner {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.cx .banner.error { background: rgba(196, 67, 46, 0.1); color: var(--crimson);
+}
+
+.cx .banner.ok { background: rgba(45, 106, 79, 0.1); color: var(--emerald);
+}
+
+.cx .banner.info { background: var(--ink-08); color: var(--ink-60);
+}
+
+/* Shown when the Maps script itself fails — a blank grey box tells the user
+   nothing, and this is the most likely thing to go wrong on a new key. */
+.cx .map-failed {
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: var(--paper-sunk);
+  text-align: center;
+}
+.cx .map-failed > div { max-width: 460px; }
+.cx .map-failed strong { display: block; margin-bottom: 8px; color: var(--crimson); }
+.cx .map-failed p { margin: 0 0 8px; font-size: 12.5px; color: var(--ink-60); line-height: 1.55; }

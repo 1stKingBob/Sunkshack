@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { formatLength, type UnitSystem } from '../units';
 
 /**
- * The community view.
+ * Fallback community view, shown only when the map app cannot run.
  *
  * Deliberately NOT a review feed. An accessibility claim is only worth
  * something if it is backed by a measurement — "it seemed fine to me" is how
@@ -86,7 +86,7 @@ const SAMPLE: Entry[] = [
   },
 ];
 
-export function Community({ units }: { units: UnitSystem }) {
+export function SampleList({ units }: { units: UnitSystem }) {
   const [filter, setFilter] = useState<'all' | 'pass' | 'fail'>('all');
   const shown = SAMPLE.filter((e) =>
     filter === 'all' ? true : filter === 'pass' ? e.passes : !e.passes,
@@ -96,9 +96,10 @@ export function Community({ units }: { units: UnitSystem }) {
     <div className="page">
       <div className="page-inner">
         <div className="sample-banner">
-          <strong>Sample data.</strong> Weave has no live community yet — every entry below is
-          fabricated to show the format. Real entries would come from published Care Passes, not
-          from opinions.
+          <strong>Sample data — the live map is not configured.</strong> Set{' '}
+          <code>VITE_GOOGLE_MAPS_API_KEY</code> and the two <code>VITE_SUPABASE_*</code> values in{' '}
+          <code>.env.local</code> to load real places and real scores. The entries below are
+          fabricated, and are here so the page still shows what an entry looks like.
         </div>
 
         <h1 className="page-title">Rooms people have measured</h1>

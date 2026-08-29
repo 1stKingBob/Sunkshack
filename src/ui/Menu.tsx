@@ -14,7 +14,7 @@ export function Menu({ onGo }: { onGo(d: Destination): void }) {
   return (
     <div className="menu">
       <DotPattern
-        color="rgba(163, 190, 210, 0.34)"
+        color="rgba(255, 255, 255, 0.22)"
         cr={1}
         width={26}
         height={26}

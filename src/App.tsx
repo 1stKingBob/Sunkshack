@@ -10,10 +10,10 @@ import { formatLength, type UnitSystem } from './units';
 import { Rail } from './ui/Rail';
 import { Results } from './ui/Results';
 import { Stage } from './ui/Stage';
-import { CarePass } from './ui/CarePass';
+import { CarePass, buildReport, encodeReport } from './ui/CarePass';
 import { Intro } from './ui/Intro';
 import { Menu, type Destination } from './ui/Menu';
-import { Community } from './ui/Community';
+import { CommunityApp } from './community/CommunityApp';
 import { Method } from './ui/Method';
 
 type View = 'intro' | 'menu' | 'dashboard' | 'community' | 'method';
@@ -218,7 +218,7 @@ export default function App() {
         </button>
         <span className="tagline">
           {view === 'community'
-            ? 'Rooms people have measured'
+            ? 'Places people have measured'
             : view === 'method'
               ? 'Method & standards'
               : 'Does this room actually work for the person in it?'}
@@ -241,7 +241,7 @@ export default function App() {
         )}
       </header>
 
-      {view === 'community' && <Community units={units} />}
+      {view === 'community' && <CommunityApp units={units} />}
       {view === 'method' && <Method units={units} />}
 
       {view === 'dashboard' && (
@@ -339,6 +339,16 @@ export default function App() {
           profile={profile}
           units={units}
           onClose={() => setPassOpen(false)}
+          onPublish={() => {
+            // Hand the finished check to the Community screen through the URL
+            // fragment its upload page already reads, so the two halves stay
+            // decoupled — Community accepts a report, not this app's state.
+            window.location.hash = `/upload?report=${encodeURIComponent(
+              encodeReport(buildReport(room, result, profile)),
+            )}`;
+            setPassOpen(false);
+            setView('community');
+          }}
         />
       )}
     </div>

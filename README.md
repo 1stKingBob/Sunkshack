@@ -129,6 +129,33 @@ about doorway hardware, floor surfaces, thresholds, lighting, or reach ranges.
 The UI never says "ADA compliant"; it says "meets the clearance settings you
 defined".
 
+## Community
+
+The Community screen searches real places on a Google map and shows the
+accessibility score that other people's room checks have given them. It needs
+three values in `.env.local` (see `.env.example`) and `supabase/schema.sql`
+run once against a fresh Supabase project.
+
+Without a Maps key it falls back to a labelled sample list rather than showing
+an empty page — a configuration banner on a projector reads as a broken
+feature, and there is no useful fallback for a map itself.
+
+A score is not a rating anyone typed. `src/community/lib/score.ts` derives a
+0–10 number from a report's measured-versus-required margins: 0 at half the
+required clearance, 5 at exactly the minimum, 10 at 1.5× or more. A bare pass
+is not a 10, because a bare pass is not comfortable. It exists so the search
+filter has something to sort on, not as a certification.
+
+Its stylesheet is scoped under `.cx` (`src/community/community.css`). It was
+written as a standalone app that owned the whole page and defines `.app`,
+`.topbar`, `.btn` and others that already mean something else here.
+
+The handoff runs through `buildReport` in `src/ui/CarePass.tsx`: a plain,
+versioned JSON object carrying routes, measurements and the profile used —
+and deliberately not furniture positions, photos, or an address. Publishing a
+clearance summary should not mean publishing a floor plan of where someone
+sleeps.
+
 ## Layout
 
 ```
@@ -142,6 +169,8 @@ src/pipeline/         photo → detections → placed furniture, with fallback
 src/scene/            three.js plan view, drag, hatching, wheelchair
 src/ui/               rail, findings, Care Pass
 api/analyze.ts        serverless vision call — the API key lives only here
+src/community/        map, scores, report upload (scoped CSS, own lib/)
+supabase/schema.sql   run once against a fresh Supabase project
 ```
 
 ## Tests

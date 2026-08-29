@@ -38,7 +38,7 @@ export function Intro({ onDone }: Props) {
   return (
     <div className="intro" data-leaving={leaving}>
       <DotPattern
-        color="rgba(163, 190, 210, 0.5)"
+        color="rgba(255, 255, 255, 0.34)"
         cr={1}
         width={26}
         height={26}

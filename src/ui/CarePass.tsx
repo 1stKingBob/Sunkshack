@@ -1,6 +1,61 @@
 import type { ClearanceResult, MobilityProfile, Room } from '../types';
+import type { WeaveReport } from '../community/types';
 import { formatLength, type UnitSystem } from '../units';
 import { FURNITURE } from '../data/furniture';
+
+/**
+ * Turn a finished check into the portable report the Community screen accepts.
+ *
+ * This is deliberately a plain, versioned JSON object rather than a shared
+ * type import: it crosses a boundary — it can be saved to a file, pasted, or
+ * carried in a URL — so it has to survive independently of this codebase's
+ * internals. `weaveReport: 1` is the version marker the reader checks.
+ *
+ * Note what is NOT in here: no furniture positions, no room photo, no address.
+ * Publishing a clearance summary should not mean publishing a floor plan of
+ * where someone sleeps.
+ */
+export function buildReport(
+  room: Room,
+  result: ClearanceResult,
+  profile: MobilityProfile,
+): WeaveReport {
+  return {
+    weaveReport: 1,
+    generatedAt: new Date().toISOString(),
+    profileId: profile.id,
+    profileName: profile.name,
+    profileSource: profile.source,
+    roomWidthMm: room.width,
+    roomDepthMm: room.depth,
+    routes: result.routes.map((r) => ({
+      label: `${room.anchors.find((a) => a.id === r.fromAnchorId)?.label ?? 'Entry'} → ${
+        room.anchors.find((a) => a.id === r.toAnchorId)?.label ?? 'Destination'
+      }`,
+      measuredMm: Math.round(r.bottleneck),
+      requiredMm: profile.minPathWidth,
+      passes: r.passes,
+    })),
+    turning: result.turningCircle
+      ? {
+          diameterMm: Math.round(result.turningCircle.diameter),
+          requiredMm: profile.turningDiameter,
+          passes: result.turningCircle.passes,
+        }
+      : null,
+    passes: result.passes,
+    furnitureCount: room.furniture.length,
+  };
+}
+
+/** base64 of the UTF-8 JSON, safe to carry in a URL fragment. */
+export function encodeReport(report: WeaveReport): string {
+  const json = JSON.stringify(report);
+  const bytes = new TextEncoder().encode(json);
+  let binary = '';
+  bytes.forEach((b) => (binary += String.fromCharCode(b)));
+  return btoa(binary);
+}
 
 interface Props {
   room: Room;
@@ -8,6 +63,7 @@ interface Props {
   profile: MobilityProfile;
   units: UnitSystem;
   onClose(): void;
+  onPublish?(): void;
 }
 
 /**
@@ -21,7 +77,7 @@ interface Props {
  * "enough space" feels like. This is the shared, objective artefact between
  * them — a single page they can both point at.
  */
-export function CarePass({ room, result, profile, units, onClose }: Props) {
+export function CarePass({ room, result, profile, units, onClose, onPublish }: Props) {
   const now = new Date();
   const routeLines = result.routes.map((r) => {
     const from = room.anchors.find((a) => a.id === r.fromAnchorId)?.label ?? 'Entry';
@@ -126,6 +182,28 @@ export function CarePass({ room, result, profile, units, onClose }: Props) {
           <button className="btn" onClick={onClose}>
             Close
           </button>
+          <button
+            className="btn"
+            onClick={() => {
+              const report = buildReport(room, result, profile);
+              const blob = new Blob([JSON.stringify(report, null, 2)], {
+                type: 'application/json',
+              });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `weave-report-${new Date().toISOString().slice(0, 10)}.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            Download report
+          </button>
+          {onPublish && (
+            <button className="btn" onClick={onPublish}>
+              Publish to Community →
+            </button>
+          )}
           <button className="btn primary" onClick={() => window.print()}>
             Print / save as PDF
           </button>

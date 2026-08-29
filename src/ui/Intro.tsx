@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FloatingPaths } from './FloatingPaths';
+import { FloatingPathsBackground } from './FloatingPaths';
 
 interface Props {
   onDone(): void;
@@ -37,7 +37,7 @@ export function Intro({ onDone }: Props) {
 
   return (
     <div className="intro" data-leaving={leaving}>
-      <FloatingPaths position={1} />
+      <FloatingPathsBackground position={-1} />
 
       <div className="intro-mark">
         <h1 className="intro-word" aria-label="Weave">

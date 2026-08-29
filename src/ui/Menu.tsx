@@ -1,4 +1,4 @@
-import { FloatingPaths } from './FloatingPaths';
+import { FloatingPathsBackground } from './FloatingPaths';
 import { OptionWheel, type WheelItem } from './OptionWheel';
 
 export type Destination = 'dashboard' | 'community' | 'method' | 'exit';
@@ -13,8 +13,7 @@ const ITEMS: (WheelItem & { key: Destination })[] = [
 export function Menu({ onGo }: { onGo(d: Destination): void }) {
   return (
     <div className="menu">
-      {/* Quieter than the intro: there is a menu to read on top of this one. */}
-      <FloatingPaths position={-1} count={30} intensity={0.55} />
+      <FloatingPathsBackground position={-1} />
 
       <header className="menu-head">
         <span className="wordmark" style={{ color: 'var(--paper)' }}>

@@ -849,38 +849,25 @@ select { font-family: var(--sans); }
 }
 
 /* ── floating paths background ──────────────────────────────────────────── */
+/* The four Tailwind utilities the supplied component used, written out:
+     .fp-root  = w-full relative
+     .fp-layer = absolute inset-0 pointer-events-none
+     .fp-svg   = w-full h-full  +  dark:text-white  (stroke is currentColor) */
 
-.paths-layer {
+.fp-root {
   position: absolute;
-  inset: -12%;
-  pointer-events: none;
-  overflow: hidden;
+  inset: 0;
+  width: 100%;
 }
 
-.paths {
+.fp-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.fp-svg {
   width: 100%;
   height: 100%;
-  display: block;
-}
-
-/*
-   The perpetual motion is a transform, not a dash offset.
-
-   stroke-dashoffset is a paint property: animating it re-rasterises the whole
-   stroke on the CPU every frame, and at this scale that measured 0.6 fps.
-   A transform is handled by the compositor — the field is painted once and
-   then moved — so this costs effectively nothing no matter how large it is.
-*/
-.paths-drift {
-  will-change: transform;
-  animation: paths-drift 38s ease-in-out infinite alternate;
-}
-
-@keyframes paths-drift {
-  from { transform: translate3d(-2.5%, -1.5%, 0) scale(1.06); }
-  to   { transform: translate3d(2.5%, 1.5%, 0) scale(1.12); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .paths-drift { animation: none; will-change: auto; }
+  color: #fff;
 }

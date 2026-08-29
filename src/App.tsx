@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AnchorPoint, FurnitureItem, FurnitureType, Room } from './types';
 import { checkClearance } from './engine/clearance';
 import { applySuggestion, suggestFix, type Suggestion } from './engine/suggest';
@@ -20,11 +20,38 @@ type View = 'intro' | 'menu' | 'dashboard' | 'community' | 'method';
 
 let anchorSeq = 0;
 
+/**
+ * Persists the room being worked on, so it survives an unrequested reload —
+ * the most common one being a mobile browser reclaiming this tab's memory
+ * while the OS camera app is open for "Take a photo", then reloading it on
+ * return. That isn't preventable from here, but losing everything the user
+ * placed is: restore on the next mount instead of starting over.
+ */
+const SAVE_KEY = 'weave.dashboard.v1';
+
+interface SavedDashboard {
+  room: Room;
+  profileId: string;
+  units: UnitSystem;
+}
+
+function loadSaved(): SavedDashboard | null {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || !parsed.room) return null;
+    return parsed as SavedDashboard;
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
   const [view, setView] = useState<View>('intro');
-  const [room, setRoom] = useState<Room>(() => cloneRoom(DEMO_BEDROOM));
-  const [profileId, setProfileId] = useState(DEFAULT_PROFILE_ID);
-  const [units, setUnits] = useState<UnitSystem>('metric');
+  const [room, setRoom] = useState<Room>(() => loadSaved()?.room ?? cloneRoom(DEMO_BEDROOM));
+  const [profileId, setProfileId] = useState(() => loadSaved()?.profileId ?? DEFAULT_PROFILE_ID);
+  const [units, setUnits] = useState<UnitSystem>(() => loadSaved()?.units ?? 'metric');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [placing, setPlacing] = useState<'entry' | 'destination' | null>(null);
   const [showChair, setShowChair] = useState(true);
@@ -35,6 +62,16 @@ export default function App() {
   const [suggesting, setSuggesting] = useState(false);
 
   const profile = getProfile(profileId);
+
+  useEffect(() => {
+    try {
+      const payload: SavedDashboard = { room, profileId, units };
+      localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+    } catch {
+      // Private browsing / storage full / disabled — the room still works
+      // for this session, it just won't survive a reload.
+    }
+  }, [room, profileId, units]);
 
   // Cheap enough to run synchronously on every render, including every frame
   // of a drag — that is the whole point of the distance-field design.

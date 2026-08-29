@@ -118,6 +118,19 @@
   overflow: hidden;
 }
 
+/* Same idiom as the room-check screen's rail/stage stack (see .body in the
+   root styles.css): below tablet width there isn't room for a 380px sidebar
+   beside a map — the map was left with a few px. Stack them instead, capping
+   the sidebar so the map — the reason this screen exists — always keeps most
+   of the height. The place list scrolls inside its own capped row. */
+@media (max-width: 720px) {
+  .cx .map-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(160px, 40%) 1fr;
+  }
+  .cx .sidebar { border-right: none; border-bottom: 1px solid var(--ink-15); }
+}
+
 .cx .sidebar {
   border-right: 1px solid var(--ink-15);
   background: var(--paper-raised);
@@ -257,6 +270,14 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* Same overlay-over-map problem as the sidebar above: a fixed 340px card
+   pinned to the right edge leaves almost nothing of a ~390px-wide phone
+   screen showing the map underneath. Full-width and capped short of the
+   full height instead, so the map stays visible above it. */
+@media (max-width: 720px) {
+  .cx .building-panel { top: auto; left: 12px; right: 12px; width: auto; max-height: 55%; }
 }
 
 .cx .building-panel-head {

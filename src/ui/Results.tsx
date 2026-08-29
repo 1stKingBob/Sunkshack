@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ClearanceResult, MobilityProfile, Room } from '../types';
 import { passesWithMargin, SUGGEST_MARGIN_MM, type Suggestion } from '../engine/suggest';
 import { formatLength, type UnitSystem } from '../units';
@@ -32,18 +33,29 @@ export function Results({
 }: Props) {
   const label = (id?: string) => room.anchors.find((a) => a.id === id)?.label ?? '—';
   const marginOk = passesWithMargin(result, profile);
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="results">
+    <div className="results" data-collapsed={collapsed}>
       <header>
         <h3>Findings</h3>
-        <div className="verdict" data-pass={result.passes}>
-          <span className="mark">{result.passes ? '✓' : '!'}</span>
-          {result.passes ? 'Clear' : `${result.violations.length} issue${result.violations.length === 1 ? '' : 's'}`}
+        <div className="results-header-actions">
+          <div className="verdict" data-pass={result.passes}>
+            <span className="mark">{result.passes ? '✓' : '!'}</span>
+            {result.passes ? 'Clear' : `${result.violations.length} issue${result.violations.length === 1 ? '' : 's'}`}
+          </div>
+          <button
+            className="results-toggle"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-label={collapsed ? 'Expand findings' : 'Minimise findings'}
+            title={collapsed ? 'Expand findings' : 'Minimise findings'}
+          >
+            {collapsed ? '▴' : '▾'}
+          </button>
         </div>
       </header>
 
-      <div className="inner">
+      {!collapsed && <div className="inner">
         {result.routes.map((r) => (
           <div className="finding" key={`${r.fromAnchorId}-${r.toAnchorId}`} data-ok={r.passes}>
             <div className="bar" />
@@ -177,7 +189,7 @@ export function Results({
           </span>
           <span>±{result.cellSize / 2} mm</span>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

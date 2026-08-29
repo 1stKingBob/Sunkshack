@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
 /**
@@ -37,7 +37,33 @@ function apiDev(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [react(), apiDev()],
-  server: { host: true, port: 5173 },
+/**
+ * Server-side secrets that api/analyze.ts reads from process.env.
+ * Deliberately NOT VITE_ prefixed — a VITE_ variable is inlined into the
+ * browser bundle, which is exactly how API keys end up scraped.
+ */
+const SERVER_ENV = [
+  'ANTHROPIC_API_KEY',
+  'GEMINI_API_KEY',
+  'GOOGLE_API_KEY',
+  'ANTHROPIC_MODEL',
+  'GEMINI_MODEL',
+];
+
+export default defineConfig(({ mode }) => {
+  // Vite reads .env files, but only ever exposes VITE_ prefixed values, and
+  // only to the client. Nothing puts an unprefixed key into process.env, so
+  // the dev-server API handler would never see it — it worked on Vercel
+  // (which injects env vars itself) and silently failed locally. Load the
+  // env files here and hand the server keys to process.env explicitly.
+  const env = loadEnv(mode, process.cwd(), '');
+  for (const key of SERVER_ENV) {
+    // A real shell variable still wins over the file.
+    if (env[key] && !process.env[key]) process.env[key] = env[key];
+  }
+
+  return {
+    plugins: [react(), apiDev()],
+    server: { host: true, port: 5173 },
+  };
 });

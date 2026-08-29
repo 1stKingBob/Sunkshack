@@ -62,15 +62,107 @@ Return ONLY minified JSON, no prose, no code fence:
 {"items":[{"type":"bed","confidence":0.9,"fx":0.3,"fy":0.4,"rotation":0,"sizeHint":"Queen"}]}
 type must be one of: ${TYPES.join(', ')}`;
 
+const USER_TURN = 'Identify the floor-standing furniture and give the top-down plan positions.';
+
+/** Anthropic Messages API with a base64 image. */
+async function callAnthropic(
+  key: string,
+  data: string,
+  mediaType: string,
+): Promise<{ text?: string; error?: string }> {
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5',
+      max_tokens: 1200,
+      system: SYSTEM,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data } },
+            { type: 'text', text: USER_TURN },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!r.ok) {
+    const detail = await r.text().catch(() => '');
+    return { error: `Anthropic returned ${r.status}. ${detail.slice(0, 160)}` };
+  }
+  const json = (await r.json()) as { content?: { type: string; text?: string }[] };
+  return { text: (json.content ?? []).map((c) => c.text ?? '').join('').trim() };
+}
+
+/**
+ * Google Gemini, as an alternative provider.
+ *
+ * Same prompt, same expected JSON shape — only the request envelope differs, so
+ * whichever key is available produces an identical result downstream. Gemini is
+ * worth supporting because its free tier is far easier to obtain than a billed
+ * Anthropic key, which matters when the person running this is a student.
+ */
+async function callGemini(
+  key: string,
+  data: string,
+  mediaType: string,
+): Promise<{ text?: string; error?: string }> {
+  // Google retires model aliases fairly aggressively — gemini-2.0-flash was
+  // withdrawn while this was being built. If this 404s, the error body names
+  // the current replacement; set GEMINI_MODEL rather than editing this line.
+  const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+  const r = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: SYSTEM }] },
+        contents: [
+          {
+            role: 'user',
+            parts: [{ inline_data: { mime_type: mediaType, data } }, { text: USER_TURN }],
+          },
+        ],
+        generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 1200 },
+      }),
+    },
+  );
+
+  if (!r.ok) {
+    const detail = await r.text().catch(() => '');
+    return {
+      error:
+        `Gemini returned ${r.status}. ${detail.slice(0, 160)}` +
+        (r.status === 404 ? ` (try setting GEMINI_MODEL to a model your key can access)` : ''),
+    };
+  }
+  const json = (await r.json()) as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+  };
+  const parts = json.candidates?.[0]?.content?.parts ?? [];
+  return { text: parts.map((p) => p.text ?? '').join('').trim() };
+}
+
 export async function analyze(body: AnalyzeRequest): Promise<AnalyzeResponse> {
   const warnings: string[] = [];
-  const key = process.env.ANTHROPIC_API_KEY;
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
-  if (!key) {
+  if (!anthropicKey && !geminiKey) {
     return {
       items: [],
       mode: 'fallback',
-      warnings: ['No ANTHROPIC_API_KEY configured — add one to .env.local to enable photo analysis.'],
+      warnings: [
+        'No vision key configured — add ANTHROPIC_API_KEY or GEMINI_API_KEY to .env.local to enable photo analysis.',
+      ],
     };
   }
 
@@ -80,43 +172,15 @@ export async function analyze(body: AnalyzeRequest): Promise<AnalyzeResponse> {
 
   let text: string;
   try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
-        max_tokens: 1200,
-        system: SYSTEM,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'image', source: { type: 'base64', media_type: mediaType, data: raw } },
-              {
-                type: 'text',
-                text: 'Identify the floor-standing furniture and give the top-down plan positions.',
-              },
-            ],
-          },
-        ],
-      }),
-    });
+    // Anthropic wins if both are set; Gemini is the fallback provider.
+    const res = anthropicKey
+      ? await callAnthropic(anthropicKey, raw, mediaType)
+      : await callGemini(geminiKey!, raw, mediaType);
 
-    if (!r.ok) {
-      const detail = await r.text().catch(() => '');
-      return {
-        items: [],
-        mode: 'fallback',
-        warnings: [`Vision API returned ${r.status}. ${detail.slice(0, 160)}`],
-      };
+    if (res.error) {
+      return { items: [], mode: 'fallback', warnings: [res.error] };
     }
-
-    const json = (await r.json()) as { content?: { type: string; text?: string }[] };
-    text = (json.content ?? []).map((c) => c.text ?? '').join('').trim();
+    text = res.text ?? '';
   } catch (err) {
     return {
       items: [],

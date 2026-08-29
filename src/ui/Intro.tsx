@@ -37,7 +37,7 @@ export function Intro({ onDone }: Props) {
 
   return (
     <div className="intro" data-leaving={leaving}>
-      <FloatingPathsBackground position={-1} />
+      <FloatingPathsBackground position={-1} count={16} />
 
       <div className="intro-mark">
         <h1 className="intro-word" aria-label="Weave">

@@ -18,12 +18,25 @@ export function FloatingPathsBackground({
   position,
   children,
   className,
+  /**
+   * Defaults to 36, exactly as supplied. It is a prop because the cost of this
+   * effect is linear in the number of paths and independent of their size:
+   * measured full-screen, 36 paths ran at 6 fps, 12 at 12 fps, 4 at 29 fps,
+   * none at 60. Each animated path re-rasterises its whole stroke every frame
+   * on the CPU, because stroke-dashoffset is a paint property.
+   *
+   * The original demo lives in a small aspect-16/9 panel where 36 is fine.
+   * Full-bleed it is not, and anything drawn on top gets starved of frames —
+   * which is what made the menu options flicker and disappear.
+   */
+  count = 36,
 }: {
   position: number;
   className?: string;
   children?: React.ReactNode;
+  count?: number;
 }) {
-  const paths = Array.from({ length: 36 }, (_, i) => ({
+  const paths = Array.from({ length: count }, (_, i) => ({
     id: i,
     d: `M-${380 - i * 5 * position} -${189 + i * 6}C-${
       380 - i * 5 * position

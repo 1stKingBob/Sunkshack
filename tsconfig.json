@@ -8,6 +8,9 @@
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
+    // OptionWheel ships as .jsx and is kept byte-identical to the source.
+    "allowJs": true,
+    "checkJs": false,
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",

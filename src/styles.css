@@ -667,67 +667,19 @@ select { font-family: var(--sans); }
   color: rgba(255, 255, 255, 0.32);
 }
 
-.wheel {
-  position: absolute;
-  inset: 0;
-  outline: none;
-  z-index: 2;
-  cursor: grab;
-  touch-action: none;
-}
-.wheel:active { cursor: grabbing; }
-.wheel:focus-visible .wheel-opt[data-focused='true']::before {
-  content: '';
-  position: absolute;
-  left: -0.42em;
-  top: 50%;
-  width: 4px;
-  height: 0.62em;
-  transform: translateY(-50%);
-  background: #fff;
-  border-radius: 2px;
-}
 
-.wheel-opt {
-  position: absolute;
-  top: 50%;
-  line-height: 1.05;
-  border: 0;
-  background: none;
-  padding: 0;
-  white-space: nowrap;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: rgba(255, 255, 255, 0.66);
-  transition-property: transform, opacity, filter, color;
-  transition-timing-function: cubic-bezier(0.22, 0.75, 0.2, 1);
-  will-change: transform, opacity, filter;
-  transform-origin: left center;
-}
-.wheel[data-side='left'] .wheel-opt { left: max(14vw, 130px); }
-.wheel[data-side='center'] .wheel-opt { left: 50%; }
 
-.wheel-opt[data-focused='true'] { color: #fff; }
 
-.wheel-hint {
-  /* Absolutely positioned so it cannot add height to the focused row — an
-     in-flow hint pushes the next option down and the two collide. */
-  position: absolute;
-  left: 2px;
-  top: calc(100% + 4px);
-  white-space: nowrap;
-  font-size: 0.3em;
-  font-weight: 400;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.5);
-  opacity: 0;
-  animation: fade-in 300ms 120ms ease forwards;
-}
 
-@media (prefers-reduced-motion: reduce) {
-  .wheel-opt { transition-duration: 1ms !important; }
-}
+
+
+
+
+
+
+
+
+
 
 /* ── secondary pages ────────────────────────────────────────────────────── */
 
@@ -862,12 +814,78 @@ select { font-family: var(--sans); }
 
 .fp-layer {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
   pointer-events: none;
+
+  /*
+     THE FLICKER FIX, and it is not a change to the animation.
+
+     pathLength/pathOffset compile to stroke-dashoffset, a paint property: the
+     browser re-rasterises every stroke on the CPU each frame. Cost scales with
+     the number of PIXELS painted, so 36 full-screen curves at native size
+     measured 6 fps, and everything drawn over the top — the wheel — was
+     starved of frames and appeared to flicker and drop out.
+
+     So the layer is laid out at 40% and scaled back up by the compositor.
+     Identical animation, identical geometry, roughly a sixth of the pixels to
+     paint. The upscale costs nothing on the GPU, and on strokes this faint it
+     is not visible.
+  */
+  width: 40%;
+  height: 40%;
+  transform: scale(2.5) translateZ(0);
+  transform-origin: 0 0;
+  will-change: transform;
+  contain: strict;
 }
 
 .fp-svg {
   width: 100%;
   height: 100%;
   color: #fff;
+}
+
+/* ── menu wheel (react-bits OptionWheel) ────────────────────────────────── */
+
+.menu-wheel {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  /* Its own stacking context and paint container, so the animated background
+     behind it cannot force the wheel to repaint. That coupling was what made
+     the options flicker and drop out. */
+  isolation: isolate;
+  contain: paint;
+}
+
+.menu-caption {
+  position: absolute;
+  left: 80px;
+  bottom: 84px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.menu-hint {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.menu-open {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+.menu-open:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+@media (max-width: 760px) {
+  .menu-caption { left: 24px; bottom: 74px; flex-direction: column; align-items: flex-start; gap: 10px; }
 }

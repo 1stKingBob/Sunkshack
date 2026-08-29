@@ -852,40 +852,18 @@ select { font-family: var(--sans); }
   position: absolute;
   inset: 0;
   z-index: 2;
-  /* Its own stacking context and paint container, so the animated background
-     behind it cannot force the wheel to repaint. That coupling was what made
-     the options flicker and drop out. */
   isolation: isolate;
-  contain: paint;
 }
 
-.menu-caption {
-  position: absolute;
-  left: 80px;
-  bottom: 84px;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  gap: 16px;
+/* The options are the navigation now, so they need to read as clickable, and
+   hovering has to show which one the cursor is actually on — the wheel's own
+   blur/opacity falloff otherwise makes the off-centre ones look inert. Only
+   colour is touched here; transform, opacity and filter are set inline per
+   frame by the wheel and must not be fought over. */
+.menu-wheel .option-wheel__item {
+  cursor: pointer;
+  transition: color 140ms ease;
 }
-
-.menu-hint {
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.42);
-}
-
-.menu-open {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.22);
-  color: #fff;
-}
-.menu-open:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.4);
-}
-
-@media (max-width: 760px) {
-  .menu-caption { left: 24px; bottom: 74px; flex-direction: column; align-items: flex-start; gap: 10px; }
+.menu-wheel .option-wheel__item:hover {
+  color: var(--ow-active-color);
 }

@@ -1,26 +1,29 @@
-import { useState } from 'react';
-import { FloatingPathsBackground } from './FloatingPaths';
-// Ships as .jsx and is kept byte-identical to the react-bits source.
+// Ships as .jsx; the react-bits source plus an onActivate callback.
 import OptionWheel from './OptionWheel.jsx';
 
 export type Destination = 'dashboard' | 'community' | 'method' | 'exit';
 
-const ITEMS: { key: Destination; label: string; hint: string }[] = [
-  { key: 'dashboard', label: 'Dashboard', hint: 'Check a room' },
-  { key: 'community', label: 'Community', hint: 'Places others have measured' },
-  { key: 'method', label: 'Method', hint: 'The standards and the maths' },
-  { key: 'exit', label: 'Exit', hint: 'Back to the start' },
+const ITEMS: { key: Destination; label: string }[] = [
+  { key: 'dashboard', label: 'Dashboard' },
+  { key: 'community', label: 'Community' },
+  { key: 'method', label: 'Method' },
+  { key: 'exit', label: 'Exit' },
 ];
 
 const LABELS = ITEMS.map((i) => i.label);
 
+/**
+ * The menu is the wheel and nothing else.
+ *
+ * There is deliberately no animated background here. The paths effect
+ * re-rasterises every stroke on the CPU each frame, and it was competing with
+ * the wheel's own rAF loop for the same budget on the same screen — the wheel
+ * is the interactive thing, so it gets the frames. The intro still has it,
+ * where nothing else is moving.
+ */
 export function Menu({ onGo }: { onGo(d: Destination): void }) {
-  const [index, setIndex] = useState(0);
-
   return (
     <div className="menu">
-      <FloatingPathsBackground position={-1} count={10} />
-
       <header className="menu-head">
         <span className="wordmark" style={{ color: 'var(--paper)' }}>
           <span className="glyph glyph-light" />
@@ -45,20 +48,11 @@ export function Menu({ onGo }: { onGo(d: Destination): void }) {
           inset={80}
           loop={false}
           draggable
-          onChange={(i: number) => setIndex(i)}
+          onActivate={(i: number) => onGo(ITEMS[i].key)}
         />
       </div>
 
-      {/* The wheel takes plain strings, so the hint for whatever is currently
-          centred sits alongside it rather than inside an option. */}
-      <div className="menu-caption">
-        <span className="menu-hint">{ITEMS[index].hint}</span>
-        <button className="btn menu-open" onClick={() => onGo(ITEMS[index].key)}>
-          Open {ITEMS[index].label} →
-        </button>
-      </div>
-
-      <p className="menu-help">Scroll, drag or use ↑ ↓ · click an option to centre it</p>
+      <p className="menu-help">Scroll, drag or use ↑ ↓ · click to centre, click again to open</p>
     </div>
   );
 }

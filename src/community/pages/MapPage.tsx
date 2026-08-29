@@ -4,6 +4,7 @@ import { BuildingPanel } from '../components/BuildingPanel';
 import { fetchScoresForPlaces } from '../lib/supabase';
 import { haversineMeters, formatDistance } from '../lib/distance';
 import { googleMapsConfigured } from '../lib/googleMaps';
+import { searchPlaces, toCandidate } from '../lib/placesSearch';
 import { supabaseConfigured } from '../lib/supabase';
 import type { PlaceCandidate } from '../types';
 
@@ -32,39 +33,20 @@ export function MapPage() {
     setLoading(true);
     setError(null);
     try {
-      const service = new google.maps.places.PlacesService(map);
-      const results = await new Promise<google.maps.places.PlaceResult[]>((resolve, reject) => {
-        service.textSearch({ query, location: map.getCenter(), radius: 5000 }, (res, status) => {
-          if (status === google.maps.places.PlacesServiceStatus.OK && res) resolve(res);
-          else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) resolve([]);
-          else reject(new Error(`Places search failed: ${status}`));
-        });
-      });
+      const results = await searchPlaces(map, query);
 
       const mapCenter = map.getCenter();
       const centerLat = mapCenter?.lat() ?? center.lat;
       const centerLng = mapCenter?.lng() ?? center.lng;
 
-      const placeIds = results.map((r) => r.place_id).filter((id): id is string => !!id);
-      const scores = supabaseConfigured ? await fetchScoresForPlaces(placeIds) : new Map();
+      const scores = supabaseConfigured
+        ? await fetchScoresForPlaces(results.map((r) => r.placeId))
+        : new Map();
 
       const candidates: PlaceCandidate[] = results
-        .filter((r) => r.place_id && r.geometry?.location)
-        .map((r) => {
-          const lat = r.geometry!.location!.lat();
-          const lng = r.geometry!.location!.lng();
-          return {
-            placeId: r.place_id!,
-            name: r.name ?? 'Unnamed place',
-            address: r.formatted_address ?? r.vicinity ?? '',
-            lat,
-            lng,
-            category: r.types?.[0]?.replace(/_/g, ' ') ?? null,
-            googleRating: r.rating ?? null,
-            distanceM: haversineMeters(centerLat, centerLng, lat, lng),
-            score: scores.get(r.place_id!) ?? null,
-          };
-        })
+        .map((r) =>
+          toCandidate(r, haversineMeters(centerLat, centerLng, r.lat, r.lng), scores.get(r.placeId) ?? null),
+        )
         .sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0));
 
       setPlaces(candidates);

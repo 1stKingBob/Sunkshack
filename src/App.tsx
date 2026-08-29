@@ -221,7 +221,7 @@ export default function App() {
             ? 'Places people have measured'
             : view === 'method'
               ? 'Method & standards'
-              : 'Does this room actually work for the person in it?'}
+              : 'Connecting the threads that build communities'}
         </span>
         <div className="spacer" />
         <div className="segmented">

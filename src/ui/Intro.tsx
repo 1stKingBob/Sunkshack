@@ -48,7 +48,7 @@ export function Intro({ onDone }: Props) {
           ))}
         </h1>
         <div className="intro-rule" />
-        <p className="intro-sub">Does this room actually work for the person in it?</p>
+        <p className="intro-sub">Connecting the threads that build communities</p>
       </div>
 
       <p className="intro-skip">Click anywhere to skip</p>

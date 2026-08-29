@@ -107,9 +107,10 @@ export function MapCanvas({ center, places, selectedPlaceId, onSelect, onMapRead
           <strong>The map could not load.</strong>
           <p>{loadError}</p>
           <p>
-            Usually one of: the key is wrong, the Maps JavaScript API or Places API is not enabled
-            on that Google Cloud project, billing is not active, or the key is restricted to
-            referrers that do not include this address.
+            Usually one of: the key is wrong, <strong>Maps JavaScript API</strong> or{' '}
+            <strong>Places API (New)</strong> is not enabled on that Google Cloud project, billing
+            is not active on the project, or the key is restricted to referrers that do not include{' '}
+            <code>{window.location.host}</code>.
           </p>
         </div>
       </div>

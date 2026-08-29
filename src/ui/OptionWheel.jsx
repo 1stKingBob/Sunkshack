@@ -19,7 +19,16 @@ const DEFAULT_ITEMS = [
 const OptionWheel = ({
   items = DEFAULT_ITEMS,
   defaultSelected = 3,
-  onChange,
+  // Both optional. A no-op default is what makes them optional to TypeScript
+  // (a bare `onChange,` infers as required, and `= undefined` infers the type
+  // as literally undefined). The rest signature keeps callers of any arity
+  // assignable.
+  onChange = (..._args) => {},
+  // Added on top of the react-bits source: fires when an option is *chosen*
+  // rather than merely scrolled past — click on any option, or Enter/Space on
+  // the centred one. Upstream only centres on click and leaves confirming to
+  // a separate control; here the wheel is the whole navigation.
+  onActivate = (..._args) => {},
   textColor = '#a6a6a6',
   activeColor = '#ffffff',
   side = 'left',
@@ -46,6 +55,7 @@ const OptionWheel = ({
   const lastRef = useRef(0);
   const cfgRef = useRef({});
   const onChangeRef = useRef(onChange);
+  const onActivateRef = useRef(onActivate);
   const selectedRef = useRef(defaultSelected);
   const wheelTimerRef = useRef(null);
   const dragRef = useRef(null);
@@ -59,6 +69,7 @@ const OptionWheel = ({
   const remPx = typeof window !== 'undefined' ? parseFloat(getComputedStyle(document.documentElement).fontSize) || 16 : 16;
 
   onChangeRef.current = onChange;
+  onActivateRef.current = onActivate;
   cfgRef.current = {
     count: items.length,
     items,
@@ -229,6 +240,9 @@ const OptionWheel = ({
     index => {
       if (dragMovedRef.current) return;
       const cfg = cfgRef.current;
+      // Captured before applyTarget moves the wheel: was this option already
+      // the centred one when the click landed?
+      const wasCentred = selectedRef.current === index;
       const cur = targetRef.current;
       let d = index - (((cur % cfg.count) + cfg.count) % cfg.count);
       if (cfg.loop && cfg.count > 1) {
@@ -236,12 +250,24 @@ const OptionWheel = ({
         else if (d < -cfg.count / 2) d += cfg.count;
       }
       applyTarget(cur + d, true);
+      // Clicking an option that is off-centre only brings it to the centre, so
+      // the wheel stays browsable by mouse. Clicking the one already centred is
+      // what commits — which also makes a plain double-click on any option work
+      // end to end. The drag guard above means dragging never navigates.
+      if (wasCentred) onActivateRef.current?.(index, cfg.items[index]);
     },
     [applyTarget]
   );
 
   const handleKeyDown = useCallback(
     e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        const cfg = cfgRef.current;
+        const idx = selectedRef.current;
+        onActivateRef.current?.(idx, cfg.items[idx]);
+        return;
+      }
       let delta = null;
       if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') delta = -1;
       else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') delta = 1;

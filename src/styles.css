@@ -847,3 +847,41 @@ select { font-family: var(--sans); }
   border-color: var(--emerald);
   background: repeating-linear-gradient(90deg, var(--emerald) 0 4px, transparent 4px 8px);
 }
+
+/* ── floating paths background ──────────────────────────────────────────── */
+
+.paths {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* pathLength="1" normalises every path, so one dash cycle is exactly 1 unit
+   however long the curve really is — which is what lets a single keyframe
+   drive strokes of wildly different lengths at the same visual speed. */
+.paths path {
+  stroke-dasharray: 0.36 0.64;
+  opacity: var(--path-opacity, 0.2);
+  animation-name: path-drift;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: stroke-dashoffset;
+}
+
+@keyframes path-drift {
+  0%   { stroke-dashoffset: 1; opacity: calc(var(--path-opacity, 0.2) * 0.45); }
+  50%  { opacity: var(--path-opacity, 0.2); }
+  100% { stroke-dashoffset: 0; opacity: calc(var(--path-opacity, 0.2) * 0.45); }
+}
+
+/* A background that never stops moving is a real problem for people with
+   vestibular sensitivity. The strokes stay; the drift does not. */
+@media (prefers-reduced-motion: reduce) {
+  .paths path {
+    animation: none;
+    stroke-dasharray: none;
+    opacity: calc(var(--path-opacity, 0.2) * 0.7);
+  }
+}

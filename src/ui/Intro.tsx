@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { DotPattern } from './DotPattern';
+import { FloatingPaths } from './FloatingPaths';
 
 interface Props {
   onDone(): void;
@@ -37,13 +37,8 @@ export function Intro({ onDone }: Props) {
 
   return (
     <div className="intro" data-leaving={leaving}>
-      <DotPattern
-        color="rgba(255, 255, 255, 0.34)"
-        cr={1}
-        width={26}
-        height={26}
-        mask="radial-gradient(circle at 50% 48%, black 5%, rgba(0,0,0,0.55) 40%, transparent 72%)"
-      />
+      <FloatingPaths position={1} />
+      <FloatingPaths position={-1} intensity={0.7} />
 
       <div className="intro-mark">
         <h1 className="intro-word" aria-label="Weave">

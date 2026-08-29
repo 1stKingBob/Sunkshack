@@ -1,4 +1,4 @@
-import { DotPattern } from './DotPattern';
+import { FloatingPaths } from './FloatingPaths';
 import { OptionWheel, type WheelItem } from './OptionWheel';
 
 export type Destination = 'dashboard' | 'community' | 'method' | 'exit';
@@ -13,13 +13,8 @@ const ITEMS: (WheelItem & { key: Destination })[] = [
 export function Menu({ onGo }: { onGo(d: Destination): void }) {
   return (
     <div className="menu">
-      <DotPattern
-        color="rgba(255, 255, 255, 0.22)"
-        cr={1}
-        width={26}
-        height={26}
-        mask="radial-gradient(circle at 32% 50%, black 8%, rgba(0,0,0,0.5) 45%, transparent 78%)"
-      />
+      {/* Quieter than the intro: there is a menu to read on top of this one. */}
+      <FloatingPaths position={-1} intensity={0.45} />
 
       <header className="menu-head">
         <span className="wordmark" style={{ color: 'var(--paper)' }}>

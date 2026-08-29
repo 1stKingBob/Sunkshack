@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadGoogleMaps, googleMapsConfigured } from '../lib/googleMaps';
 import { submitReport, supabaseConfigured } from '../lib/supabase';
-import { scoreChecks, scoreReport } from '../lib/score';
+import { ACCESS_MARGIN_MM, isAccessible, scoreChecks } from '../lib/score';
 import { goToMap } from '../lib/router';
 import { isWeaveReport, type Building, type WeaveReport } from '../types';
 
@@ -20,6 +20,21 @@ function decodeReportParam(param: string | null): WeaveReport | null {
   }
 }
 
+/** Places API (New) → Building, the shared field set every lookup below fetches. */
+function placeToBuilding(place: google.maps.places.Place): Building | null {
+  if (!place.id || !place.location) return null;
+  return {
+    placeId: place.id,
+    name: place.displayName ?? 'Unnamed place',
+    address: place.formattedAddress ?? null,
+    lat: place.location.lat(),
+    lng: place.location.lng(),
+    category: place.types?.[0]?.replace(/_/g, ' ') ?? null,
+  };
+}
+
+const PLACE_FIELDS = ['id', 'displayName', 'formattedAddress', 'location', 'types'];
+
 export function UploadPage({ placeIdParam, reportParam }: Props) {
   const [report, setReport] = useState<WeaveReport | null>(() => decodeReportParam(reportParam));
   const [fileError, setFileError] = useState<string | null>(null);
@@ -28,53 +43,93 @@ export function UploadPage({ placeIdParam, reportParam }: Props) {
   const [submitState, setSubmitState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const autocompleteInputRef = useRef<HTMLInputElement | null>(null);
+  const [query, setQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<google.maps.places.AutocompleteSuggestion[]>([]);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const placesLibRef = useRef<google.maps.PlacesLibrary | null>(null);
+  const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
 
+  // Places API (New) — the legacy `Autocomplete` widget and `PlacesService` this
+  // used to call are frozen for any Cloud project made after 1 March 2025, so a
+  // fresh key gets "This API project is not authorized" the instant either
+  // fires. `AutocompleteSuggestion` + `Place` are their (New) replacements — see
+  // ../lib/placesSearch.ts, which hit the same wall for the map's search box.
   useEffect(() => {
     if (!googleMapsConfigured) return;
-    let autocomplete: google.maps.places.Autocomplete | null = null;
-    loadGoogleMaps().then((g) => {
-      if (!autocompleteInputRef.current) return;
-      autocomplete = new g.maps.places.Autocomplete(autocompleteInputRef.current, {
-        fields: ['place_id', 'name', 'formatted_address', 'geometry', 'types'],
-      });
-      autocomplete.addListener('place_changed', () => {
-        const place = autocomplete!.getPlace();
-        if (!place.place_id || !place.geometry?.location) return;
-        setBuilding({
-          placeId: place.place_id,
-          name: place.name ?? 'Unnamed place',
-          address: place.formatted_address ?? null,
-          lat: place.geometry.location.lat(),
-          lng: place.geometry.location.lng(),
-          category: place.types?.[0]?.replace(/_/g, ' ') ?? null,
-        });
-      });
+    let cancelled = false;
+    loadGoogleMaps().then(async (g) => {
+      const places = (await g.maps.importLibrary('places')) as google.maps.PlacesLibrary;
+      if (cancelled) return;
+      placesLibRef.current = places;
+      sessionTokenRef.current = new places.AutocompleteSessionToken();
 
       // Arrived from a building's "Add report" button — look the place up directly.
       if (placeIdParam) {
-        const service = new g.maps.places.PlacesService(document.createElement('div'));
-        service.getDetails(
-          { placeId: placeIdParam, fields: ['place_id', 'name', 'formatted_address', 'geometry', 'types'] },
-          (place, status) => {
-            if (status === g.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
-              setBuilding({
-                placeId: place.place_id!,
-                name: place.name ?? 'Unnamed place',
-                address: place.formatted_address ?? null,
-                lat: place.geometry.location.lat(),
-                lng: place.geometry.location.lng(),
-                category: place.types?.[0]?.replace(/_/g, ' ') ?? null,
-              });
-            }
-          },
-        );
+        const place = new places.Place({ id: placeIdParam });
+        place
+          .fetchFields({ fields: PLACE_FIELDS })
+          .then(() => {
+            if (cancelled) return;
+            const b = placeToBuilding(place);
+            if (b) setBuilding(b);
+          })
+          .catch(() => {
+            if (!cancelled) setSearchError('Could not load that place — try searching for it below.');
+          });
       }
     });
     return () => {
-      if (autocomplete) google.maps.event.clearInstanceListeners(autocomplete);
+      cancelled = true;
     };
   }, [placeIdParam]);
+
+  // Debounced suggestion fetch as the user types.
+  useEffect(() => {
+    const places = placesLibRef.current;
+    if (!places || query.trim().length < 3) {
+      setSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const { suggestions: results } = await places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input: query,
+          sessionToken: sessionTokenRef.current ?? undefined,
+        });
+        if (!cancelled) setSuggestions(results);
+      } catch (e) {
+        if (!cancelled) {
+          setSuggestions([]);
+          setSearchError((e as Error).message);
+        }
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
+
+  async function pickSuggestion(s: google.maps.places.AutocompleteSuggestion) {
+    const prediction = s.placePrediction;
+    if (!prediction) return;
+    try {
+      const place = prediction.toPlace();
+      await place.fetchFields({ fields: PLACE_FIELDS });
+      const b = placeToBuilding(place);
+      if (b) setBuilding(b);
+    } catch (e) {
+      setSearchError((e as Error).message);
+      return;
+    }
+    setSuggestions([]);
+    setQuery('');
+    // A session ends once fetchFields is called on a selection — start a fresh
+    // one for the next search so billing groups each pick as its own session.
+    const places = placesLibRef.current;
+    if (places) sessionTokenRef.current = new places.AutocompleteSessionToken();
+  }
 
   async function onFile(file: File) {
     setFileError(null);
@@ -96,7 +151,7 @@ export function UploadPage({ placeIdParam, reportParam }: Props) {
     setSubmitState('busy');
     setSubmitError(null);
     try {
-      await submitReport(building, report, scoreReport(report), note);
+      await submitReport(building, report, isAccessible(report), note);
       setSubmitState('done');
     } catch (e) {
       setSubmitState('error');
@@ -104,11 +159,14 @@ export function UploadPage({ placeIdParam, reportParam }: Props) {
     }
   }
 
-  const score = report ? scoreReport(report) : null;
+  const accessible = report ? isAccessible(report) : null;
   const checks = report ? scoreChecks(report) : [];
 
   return (
     <div className="upload-page">
+      <button className="btn-link back-to-map" onClick={goToMap}>
+        ← Back to the map
+      </button>
       <h1>Add an accessibility report</h1>
       <p className="lede">
         Upload the report a room check produced, pick the building it's for, and it joins that
@@ -150,17 +208,21 @@ export function UploadPage({ placeIdParam, reportParam }: Props) {
 
       {report && (
         <div className="card">
-          <h3>2 — Score preview</h3>
-          <div className="score-hero">
-            <span className="num">{score!.toFixed(1)}</span>
-            <span className="of10">/ 10</span>
+          <h3>2 — Accessibility preview</h3>
+          <div className="access-hero" data-ok={accessible}>
+            {accessible ? 'Accessible' : 'Not accessible'}
           </div>
+          <p style={{ color: 'var(--ink-60)', fontSize: 12.5, marginTop: 6 }}>
+            Every route and the turning space need at least {ACCESS_MARGIN_MM} mm to spare over the
+            AS 1428.1 / ADA minimum — meeting the figure exactly isn't enough.
+          </p>
           <div style={{ marginTop: 12 }}>
             {checks.map((c) => (
-              <div className="report-check" data-ok={c.score >= 5} key={c.label}>
+              <div className="report-check" data-ok={c.clearsMargin} key={c.label}>
                 <span>{c.label}</span>
                 <span className="v">
                   {Math.round(c.measuredMm)} / {Math.round(c.requiredMm)} mm
+                  {c.passes && !c.clearsMargin ? ' · meets minimum, no margin' : ''}
                 </span>
               </div>
             ))}
@@ -187,7 +249,29 @@ export function UploadPage({ placeIdParam, reportParam }: Props) {
           </div>
         ) : (
           <div className="field autocomplete-wrap">
-            <input ref={autocompleteInputRef} type="text" placeholder="Search for the building or restaurant…" />
+            <input
+              type="text"
+              placeholder="Search for the building or restaurant…"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setSearchError(null);
+              }}
+            />
+            {suggestions.length > 0 && (
+              <div className="autocomplete-list">
+                {suggestions.map((s, i) => (
+                  <div
+                    className="autocomplete-item"
+                    key={s.placePrediction?.placeId ?? i}
+                    onClick={() => pickSuggestion(s)}
+                  >
+                    {s.placePrediction?.text.text ?? ''}
+                  </div>
+                ))}
+              </div>
+            )}
+            {searchError && <div className="banner error" style={{ marginTop: 10 }}>{searchError}</div>}
           </div>
         )}
       </div>

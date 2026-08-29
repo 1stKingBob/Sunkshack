@@ -213,9 +213,6 @@
 .cx .score-pill[data-tier='good'] { background: rgba(45, 106, 79, 0.14); color: var(--emerald);
 }
 
-.cx .score-pill[data-tier='mid'] { background: rgba(176, 139, 103, 0.2); color: #8a6a4c;
-}
-
 .cx .score-pill[data-tier='bad'] { background: rgba(196, 67, 46, 0.12); color: var(--crimson);
 }
 
@@ -337,6 +334,9 @@
 .cx .upload-page h1 { margin: 0 0 4px; font-size: 22px;
 }
 
+.cx .upload-page .back-to-map { display: inline-block; margin-bottom: 16px; font-size: 13px;
+}
+
 .cx .upload-page .lede { color: var(--ink-60); margin: 0 0 28px; max-width: 52ch;
 }
 
@@ -368,20 +368,20 @@
 .cx .dropzone input[type='file'] { display: none;
 }
 
-.cx .score-hero {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-
-.cx .score-hero .num {
+.cx .access-hero {
+  display: inline-flex;
+  align-items: center;
   font-family: var(--mono);
   font-weight: 700;
-  font-size: 44px;
-  line-height: 1;
+  font-size: 22px;
+  padding: 6px 14px;
+  border-radius: 999px;
 }
 
-.cx .score-hero .of10 { color: var(--ink-40); font-size: 15px;
+.cx .access-hero[data-ok='true'] { background: rgba(45, 106, 79, 0.14); color: var(--emerald);
+}
+
+.cx .access-hero[data-ok='false'] { background: rgba(196, 67, 46, 0.12); color: var(--crimson);
 }
 
 .cx .field { margin-bottom: 14px;

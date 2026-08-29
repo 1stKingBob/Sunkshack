@@ -1,4 +1,4 @@
-import type { FurnitureItem, MobilityProfile, Room } from '../types';
+import type { ClearanceResult, FurnitureItem, MobilityProfile, Room } from '../types';
 import { checkClearance } from './clearance';
 import { footprint } from './grid';
 
@@ -49,6 +49,54 @@ const CLEARANCE_FROM_WALL = 20; // mm — furniture sits flush, not embedded
 const STEP = 150; // mm between candidate slots along a wall
 const MAX_EVALUATIONS = 320;
 const TIME_BUDGET_MS = 2200;
+
+/**
+ * Extra clearance a suggestion aims for beyond the raw AS 1428.1 / ADA
+ * minimum — the same figure the Community app requires before a published
+ * report reads as "Accessible" (see ACCESS_MARGIN_MM in
+ * src/community/lib/score.ts; kept as a separate constant here rather than
+ * imported, matching how this app and the Community app share no build-time
+ * dependency). A fix that lands exactly on the code minimum has no headroom
+ * for measurement error, so it isn't a fix worth suggesting — the search
+ * targets this bar even when the room already passes the raw minimum.
+ */
+export const SUGGEST_MARGIN_MM = 150;
+
+/** Does every route and the turning circle clear the profile minimum by marginMm? */
+export function passesWithMargin(
+  res: ClearanceResult,
+  profile: MobilityProfile,
+  marginMm: number = SUGGEST_MARGIN_MM,
+): boolean {
+  const routesOk = res.routes.every((r) => r.bottleneck >= profile.minPathWidth + marginMm);
+  const turningOk = res.turningCircle
+    ? res.turningCircle.diameter >= profile.turningDiameter + marginMm
+    : true;
+  return routesOk && turningOk;
+}
+
+/**
+ * Where the search should focus: the route or turning-circle check with the
+ * least margin to spare, whether or not it fails the raw minimum outright —
+ * a room can pass AS 1428.1 exactly and still need a fix here, since
+ * "exactly" is what has no margin.
+ */
+function marginFocus(
+  res: ClearanceResult,
+  profile: MobilityProfile,
+  marginMm: number,
+): { x: number; y: number } | null {
+  let worst: { gap: number; loc: { x: number; y: number } } | null = null;
+  for (const r of res.routes) {
+    const gap = profile.minPathWidth + marginMm - r.bottleneck;
+    if (gap > 0 && (!worst || gap > worst.gap)) worst = { gap, loc: r.bottleneckAt };
+  }
+  if (res.turningCircle) {
+    const gap = profile.turningDiameter + marginMm - res.turningCircle.diameter;
+    if (gap > 0 && (!worst || gap > worst.gap)) worst = { gap, loc: res.turningCircle.centre };
+  }
+  return worst?.loc ?? null;
+}
 
 /**
  * How disruptive it is to move each kind of thing, as a multiplier on distance.
@@ -124,17 +172,16 @@ function worstBottleneck(room: Room, profile: MobilityProfile): number {
   return Math.min(...res.routes.map((r) => r.bottleneck));
 }
 
-export function suggestFix(room: Room, profile: MobilityProfile): Suggestion | null {
+export function suggestFix(
+  room: Room,
+  profile: MobilityProfile,
+  marginMm: number = SUGGEST_MARGIN_MM,
+): Suggestion | null {
   const t0 = performance.now();
   const before = checkClearance(room, profile);
-  if (before.passes) return null;
+  if (passesWithMargin(before, profile, marginMm)) return null;
 
-  // Where is the problem? Prefer a route bottleneck; fall back to the turning
-  // circle's centre if the only failure is turning space.
-  const routeViolation = before.violations.find(
-    (v) => v.type === 'path_width' || v.type === 'unreachable',
-  );
-  const focus = routeViolation?.location ?? before.turningCircle?.centre;
+  const focus = marginFocus(before, profile, marginMm);
   if (!focus) return null;
 
   const originalBottleneck =
@@ -202,6 +249,7 @@ export function suggestFix(room: Room, profile: MobilityProfile): Suggestion | n
       const res = checkClearance(trial, profile);
       const bottleneck =
         res.routes.length > 0 ? Math.min(...res.routes.map((r) => r.bottleneck)) : Infinity;
+      const solves = passesWithMargin(res, profile, marginMm);
 
       const candidate: Suggestion = {
         itemId: item.id,
@@ -209,14 +257,14 @@ export function suggestFix(room: Room, profile: MobilityProfile): Suggestion | n
         from: { x: item.x, y: item.y, rotation: item.rotation },
         to: { x: cand.x, y: cand.y, rotation: cand.rotation },
         distance: Math.round(cand.dist),
-        solves: res.passes,
+        solves,
         resultingBottleneck: bottleneck,
         originalBottleneck,
         evaluations,
         ms: 0,
       };
 
-      if (res.passes) {
+      if (solves) {
         // The pool is sorted by weighted disruption, so the first full
         // solution found is also the least disruptive one available.
         candidate.ms = performance.now() - t0;

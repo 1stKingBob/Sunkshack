@@ -1,5 +1,5 @@
 import type { ClearanceResult, MobilityProfile, Room } from '../types';
-import type { Suggestion } from '../engine/suggest';
+import { passesWithMargin, SUGGEST_MARGIN_MM, type Suggestion } from '../engine/suggest';
 import { formatLength, type UnitSystem } from '../units';
 
 interface Props {
@@ -31,6 +31,7 @@ export function Results({
   describeItem,
 }: Props) {
   const label = (id?: string) => room.anchors.find((a) => a.id === id)?.label ?? '—';
+  const marginOk = passesWithMargin(result, profile);
 
   return (
     <div className="results">
@@ -100,20 +101,29 @@ export function Results({
           </p>
         )}
 
-        {!result.passes && !suggestion && (
-          <button
-            className="btn wide primary"
-            style={{ marginTop: 12 }}
-            disabled={suggesting}
-            onClick={onSuggest}
-          >
-            {suggesting ? 'Working out a fix…' : 'Suggest a fix'}
-          </button>
+        {!marginOk && !suggestion && (
+          <>
+            {result.passes && (
+              <p className="hint" style={{ marginTop: 12 }}>
+                This clears AS 1428.1 exactly, but with no margin to spare — publishing it to the
+                community requires {formatLength(SUGGEST_MARGIN_MM, units)} of headroom on every
+                check, not just meeting the figure.
+              </p>
+            )}
+            <button
+              className="btn wide primary"
+              style={{ marginTop: result.passes ? 8 : 12 }}
+              disabled={suggesting}
+              onClick={onSuggest}
+            >
+              {suggesting ? 'Working out a fix…' : 'Suggest a fix'}
+            </button>
+          </>
         )}
 
         {suggestion && (
           <div className="suggestion" data-solves={suggestion.solves}>
-            <h4>{suggestion.solves ? 'This clears the room' : 'Closest we found'}</h4>
+            <h4>{suggestion.solves ? 'This makes it accessible' : 'Closest we found — no fix found'}</h4>
             <p>
               Move the <strong>{describeItem(suggestion.itemId)}</strong> about{' '}
               <strong>{formatLength(suggestion.distance, units)}</strong>
@@ -128,12 +138,17 @@ export function Results({
                   ? formatLength(suggestion.resultingBottleneck, units)
                   : '—'}
               </span>
-              <span className="need">needs {formatLength(profile.minPathWidth, units)}</span>
+              <span className="need">
+                needs {formatLength(profile.minPathWidth + SUGGEST_MARGIN_MM, units)} to be
+                accessible
+              </span>
             </div>
             {!suggestion.solves && (
               <p className="hint warn" style={{ marginTop: 6 }}>
-                Nothing we tried fully clears it — this room may need a smaller piece of
-                furniture rather than a different arrangement.
+                No rearrangement of the nearby furniture clears {formatLength(SUGGEST_MARGIN_MM, units)}{' '}
+                of margin here — this is the closest we found, but this room needs a smaller piece
+                of furniture, a wider room, or fewer pieces near this pinch point, not just a
+                different layout.
               </p>
             )}
             <div className="row" style={{ marginTop: 10 }}>

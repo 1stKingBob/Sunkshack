@@ -10,11 +10,9 @@ interface Props {
   onMapReady(map: google.maps.Map): void;
 }
 
-function tierColor(score: number | null): string {
-  if (score == null) return '#8a97a1';
-  if (score >= 7) return '#2d6a4f';
-  if (score >= 4) return '#b08b67';
-  return '#c4432e';
+function tierColor(accessible: boolean | null): string {
+  if (accessible == null) return '#8a97a1';
+  return accessible ? '#2d6a4f' : '#c4432e';
 }
 
 /** Thin wrapper around a raw google.maps.Map — owns the DOM node and marker sync only. */
@@ -25,6 +23,14 @@ export function MapCanvas({ center, places, selectedPlaceId, onSelect, onMapRead
   const markersRef = useRef(new Map<string, google.maps.Marker>());
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  // Always the latest `center`, unlike the prop the mount effect below closes
+  // over once. Geolocation typically resolves while the Maps script is still
+  // loading, so without this the map gets built at whatever `center` was on
+  // the very first render — and the `[center]` effect further down is a
+  // no-op at that point too, since `mapRef.current` isn't set yet. The map
+  // would silently keep the stale centre forever.
+  const centerRef = useRef(center);
+  centerRef.current = center;
 
   useEffect(() => {
     let cancelled = false;
@@ -32,7 +38,7 @@ export function MapCanvas({ center, places, selectedPlaceId, onSelect, onMapRead
       .then((g) => {
         if (cancelled || !divRef.current) return;
         const map = new g.maps.Map(divRef.current, {
-          center,
+          center: centerRef.current,
           zoom: 14,
           disableDefaultUI: false,
           streetViewControl: false,
@@ -65,7 +71,7 @@ export function MapCanvas({ center, places, selectedPlaceId, onSelect, onMapRead
     for (const place of places) {
       seen.add(place.placeId);
       let marker = markersRef.current.get(place.placeId);
-      const color = tierColor(place.score?.avgScore ?? null);
+      const color = tierColor(place.score?.accessible ?? null);
       const isSelected = place.placeId === selectedPlaceId;
 
       const icon: google.maps.Symbol = {

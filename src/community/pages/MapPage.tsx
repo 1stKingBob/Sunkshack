@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MapCanvas } from '../components/MapCanvas';
 import { BuildingPanel } from '../components/BuildingPanel';
 import { fetchScoresForPlaces } from '../lib/supabase';
@@ -8,24 +8,39 @@ import { searchPlaces, toCandidate } from '../lib/placesSearch';
 import { supabaseConfigured } from '../lib/supabase';
 import type { PlaceCandidate } from '../types';
 
-const DEFAULT_CENTER = { lat: -33.8688, lng: 151.2093 }; // Sydney — matches the AS 1428.1 figures this project ships with
+// Sydney CBD / The Rocks — a fallback only, for when geolocation is denied,
+// unsupported, or times out. Matches the AS 1428.1 figures this project ships
+// with, but is not where any given user actually is.
+const DEFAULT_CENTER = { lat: -33.8688, lng: 151.2093 };
 
-function scoreTier(score: number | null): 'good' | 'mid' | 'bad' | 'none' {
-  if (score == null) return 'none';
-  if (score >= 7) return 'good';
-  if (score >= 4) return 'mid';
-  return 'bad';
+function accessTier(accessible: boolean | null): 'good' | 'bad' | 'none' {
+  if (accessible == null) return 'none';
+  return accessible ? 'good' : 'bad';
 }
 
 export function MapPage() {
-  const [center] = useState(DEFAULT_CENTER);
+  const [center, setCenter] = useState(DEFAULT_CENTER);
   const [query, setQuery] = useState('restaurants');
-  const [minScore, setMinScore] = useState(0);
+  const [accessibleOnly, setAccessibleOnly] = useState(false);
   const [places, setPlaces] = useState<PlaceCandidate[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
+
+  // Centre on where the user actually is, not a fixed point across the city —
+  // "restaurants" from Camperdown and "restaurants" from The Rocks are
+  // different searches. Silently keeps DEFAULT_CENTER if this is denied,
+  // unsupported, or too slow; MapCanvas already pans itself on `center`
+  // changes, so this just needs to update the state.
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { timeout: 8000, maximumAge: 5 * 60 * 1000 },
+    );
+  }, []);
 
   const runSearch = useCallback(async () => {
     const map = mapRef.current;
@@ -64,8 +79,8 @@ export function MapPage() {
   }, [query, center]);
 
   const filtered = useMemo(
-    () => places.filter((p) => (minScore === 0 ? true : (p.score?.avgScore ?? -1) >= minScore)),
-    [places, minScore],
+    () => places.filter((p) => (!accessibleOnly ? true : p.score?.accessible === true)),
+    [places, accessibleOnly],
   );
 
   const selected = filtered.find((p) => p.placeId === selectedId) ?? null;
@@ -109,16 +124,14 @@ export function MapPage() {
             </button>
           </div>
           <div className="filter-row">
-            <span>Min. accessibility</span>
-            <input
-              type="range"
-              min={0}
-              max={10}
-              step={1}
-              value={minScore}
-              onChange={(e) => setMinScore(Number(e.target.value))}
-            />
-            <span className="value">{minScore === 0 ? 'any' : minScore}</span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={accessibleOnly}
+                onChange={(e) => setAccessibleOnly(e.target.checked)}
+              />
+              <span>Wheelchair accessible only</span>
+            </label>
           </div>
           {error && <div className="banner error">{error}</div>}
         </div>
@@ -141,8 +154,8 @@ export function MapPage() {
             >
               <div className="place-row-top">
                 <span className="place-row-name">{p.name}</span>
-                <span className="score-pill" data-tier={scoreTier(p.score?.avgScore ?? null)}>
-                  {p.score ? p.score.avgScore.toFixed(1) : '—'}
+                <span className="score-pill" data-tier={accessTier(p.score?.accessible ?? null)}>
+                  {p.score ? (p.score.accessible ? 'Accessible' : 'Not accessible') : '—'}
                 </span>
               </div>
               <div className="place-row-meta">

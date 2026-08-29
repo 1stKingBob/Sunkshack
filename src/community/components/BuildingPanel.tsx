@@ -35,12 +35,23 @@ export function BuildingPanel({ place, onClose }: Props) {
           {place.distanceM != null && ` · ${formatDistance(place.distanceM)} away`}
         </div>
         {place.score ? (
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
-            <span style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 26 }}>
-              {place.score.avgScore.toFixed(1)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+            <span
+              style={{
+                fontFamily: 'var(--mono)',
+                fontWeight: 700,
+                fontSize: 15,
+                padding: '3px 10px',
+                borderRadius: 999,
+                background: place.score.accessible ? 'rgba(45, 106, 79, 0.14)' : 'rgba(196, 67, 46, 0.12)',
+                color: place.score.accessible ? 'var(--emerald)' : 'var(--crimson)',
+              }}
+            >
+              {place.score.accessible ? 'Accessible' : 'Not accessible'}
             </span>
             <span style={{ color: 'var(--ink-40)', fontSize: 13 }}>
-              / 10 · {place.score.reportCount} report{place.score.reportCount === 1 ? '' : 's'}
+              {place.score.accessibleCount}/{place.score.reportCount} report
+              {place.score.reportCount === 1 ? '' : 's'} say yes
             </span>
           </div>
         ) : (
@@ -58,7 +69,15 @@ export function BuildingPanel({ place, onClose }: Props) {
           <div className="report-card" key={r.id}>
             <div className="report-card-top">
               <span className="report-card-profile">{r.profileName}</span>
-              <span style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>{r.score.toFixed(1)}</span>
+              <span
+                style={{
+                  fontFamily: 'var(--mono)',
+                  fontWeight: 700,
+                  color: r.accessible ? 'var(--emerald)' : 'var(--crimson)',
+                }}
+              >
+                {r.accessible ? '✓ Accessible' : '✗ Not accessible'}
+              </span>
             </div>
             {r.routes.map((rt, i) => (
               <div className="report-check" data-ok={rt.passes} key={i}>

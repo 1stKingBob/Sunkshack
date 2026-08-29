@@ -32,7 +32,8 @@ export async function fetchScoresForPlaces(placeIds: string[]): Promise<Map<stri
       lat: row.lat,
       lng: row.lng,
       category: row.category,
-      avgScore: Number(row.avg_score),
+      accessible: row.accessible,
+      accessibleCount: Number(row.accessible_count),
       reportCount: Number(row.report_count),
       lastReportedAt: row.last_reported_at,
     });
@@ -50,7 +51,7 @@ export async function fetchReportsForPlace(placeId: string): Promise<StoredRepor
   return (data ?? []).map((row) => ({
     id: row.id,
     placeId: row.place_id,
-    score: Number(row.score),
+    accessible: row.accessible,
     profileId: row.profile_id,
     profileName: row.profile_name,
     roomWidthMm: row.room_width_mm,
@@ -67,7 +68,7 @@ export async function fetchReportsForPlace(placeId: string): Promise<StoredRepor
 export async function submitReport(
   building: Building,
   report: WeaveReport,
-  score: number,
+  accessible: boolean,
   note: string,
 ): Promise<void> {
   const client = requireClient();
@@ -87,7 +88,7 @@ export async function submitReport(
 
   const { error: reportError } = await client.from('accessibility_reports').insert({
     place_id: building.placeId,
-    score,
+    accessible,
     profile_id: report.profileId,
     profile_name: report.profileName,
     room_width_mm: report.roomWidthMm,

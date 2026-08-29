@@ -212,7 +212,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <button className="wordmark wordmark-btn" onClick={() => setView('menu')} title="Back to menu">
+        <button className="wordmark wordmark-btn" onClick={() => setView('intro')} title="Back to start">
           <span className="glyph" />
           Weave
         </button>

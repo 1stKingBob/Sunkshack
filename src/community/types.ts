@@ -55,9 +55,11 @@ export interface Building {
   category: string | null;
 }
 
-/** A building with its aggregated community score (from building_scores view). */
+/** A building with its aggregated community verdict (from building_scores view). */
 export interface BuildingScore extends Building {
-  avgScore: number;
+  /** Majority of reports say this clears AS 1428.1 with ACCESS_MARGIN_MM to spare — see lib/score.ts. */
+  accessible: boolean;
+  accessibleCount: number;
   reportCount: number;
   lastReportedAt: string;
 }
@@ -66,7 +68,7 @@ export interface BuildingScore extends Building {
 export interface StoredReport {
   id: string;
   placeId: string;
-  score: number;
+  accessible: boolean;
   profileId: string;
   profileName: string;
   roomWidthMm: number | null;

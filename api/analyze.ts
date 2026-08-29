@@ -155,7 +155,14 @@ async function callGemini(
             ],
           },
         ],
-        generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 1200 },
+        generationConfig: {
+          responseMimeType: 'application/json',
+          // Generous, because on a thinking model the reasoning is billed
+          // against this same budget. At 1200 the model spent it all thinking
+          // and returned truncated JSON.
+          maxOutputTokens: 8192,
+          temperature: 0.2,
+        },
       }),
     },
   );
@@ -169,10 +176,27 @@ async function callGemini(
     };
   }
   const json = (await r.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
+    candidates?: {
+      finishReason?: string;
+      content?: { parts?: { text?: string; thought?: boolean }[] };
+    }[];
   };
-  const parts = json.candidates?.[0]?.content?.parts ?? [];
-  return { text: parts.map((p) => p.text ?? '').join('').trim() };
+  const cand = json.candidates?.[0];
+  const parts = cand?.content?.parts ?? [];
+
+  // Thinking models return their reasoning as additional parts flagged
+  // `thought`. Concatenating everything prefixes the JSON with prose and the
+  // parse fails — which is exactly how this presented: a valid response that
+  // looked like a broken one.
+  const answer = parts.filter((p) => !p.thought);
+  const text = (answer.length ? answer : parts).map((p) => p.text ?? '').join('').trim();
+
+  if (!text) {
+    return {
+      error: `Gemini returned no text (finishReason: ${cand?.finishReason ?? 'unknown'}).`,
+    };
+  }
+  return { text };
 }
 
 export async function analyze(body: AnalyzeRequest): Promise<AnalyzeResponse> {
@@ -214,16 +238,37 @@ export async function analyze(body: AnalyzeRequest): Promise<AnalyzeResponse> {
     };
   }
 
-  // Models sometimes wrap JSON in a fence despite instructions.
-  const cleaned = text.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
-  let parsed: AnalyzeResponse;
-  try {
-    parsed = JSON.parse(cleaned);
-  } catch {
+  // Be liberal about what comes back. Models wrap JSON in fences, prepend a
+  // sentence, or append a note, despite instructions not to — so rather than
+  // trusting the whole string, take the outermost braces and parse that.
+  let parsed: AnalyzeResponse | null = null;
+  const candidates = [
+    text,
+    text.replace(/^```(?:json)?/i, '').replace(/```\s*$/, '').trim(),
+    text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1),
+  ];
+  for (const c of candidates) {
+    if (!c) continue;
+    try {
+      const j = JSON.parse(c);
+      if (j && typeof j === 'object') {
+        parsed = j;
+        break;
+      }
+    } catch {
+      /* try the next shape */
+    }
+  }
+
+  if (!parsed) {
     return {
       items: [],
       mode: 'fallback',
-      warnings: ['The vision model did not return usable JSON; placed by heuristic instead.'],
+      // Include what actually came back — "did not return usable JSON" with no
+      // sample is unfixable from the outside.
+      warnings: [
+        `The vision model did not return usable JSON; placed by heuristic instead. It said: ${text.slice(0, 220)}`,
+      ],
     };
   }
 

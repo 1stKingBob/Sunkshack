@@ -59,31 +59,19 @@ button { cursor: pointer; }
   background: var(--paper-raised);
 }
 
-.wordmark {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  font-weight: 700;
-  font-size: 19px;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+/* The logo mark — a cropped, transparent-background export of the wordmark
+   without its tagline caption (too small to read at this size; the topbar's
+   own .tagline carries page-specific context instead). Two colour variants
+   rather than one filtered image: dark/light PNGs, chosen by which page's
+   background each renders on (see the two import sites), not by CSS filters
+   on a single source. */
+.wordmark-img {
+  display: block;
+  height: 20px;
+  width: auto;
+  transition: opacity 120ms ease;
 }
-
-.wordmark .glyph {
-  display: inline-block;
-  width: 13px;
-  height: 13px;
-  border: 2px solid var(--ink);
-  position: relative;
-  transform: translateY(1px);
-}
-.wordmark .glyph::after {
-  content: '';
-  position: absolute;
-  inset: 2px;
-  border-top: 2px solid var(--emerald);
-  transform: rotate(-38deg);
-  transform-origin: left center;
+.wordmark-btn:hover .wordmark-img { opacity: 0.75;
 }
 
 .tagline {
@@ -104,7 +92,7 @@ button { cursor: pointer; }
 @media (max-width: 640px) {
   .topbar { gap: 10px; padding: 0 12px; }
   .tagline { display: none; }
-  .wordmark { font-size: 15px; letter-spacing: 0.08em; gap: 6px; }
+  .wordmark-img { height: 16px; }
   .verdict { padding: 5px 10px 5px 8px; font-size: 11px; gap: 6px; }
   .segmented button { padding: 5px 8px; }
 }
@@ -586,6 +574,34 @@ select { font-family: var(--sans); }
   font-size: 11.5px; line-height: 1.5; color: var(--ink-60);
 }
 
+.pending-building {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 18px;
+  background: rgba(45, 106, 79, 0.08);
+  border-bottom: 1px solid var(--ink-15);
+  font-size: 12.5px;
+  color: var(--ink-60);
+}
+.pending-building strong { color: var(--ink);
+}
+.pending-building-clear {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--ink-15);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink-60);
+  font-size: 11px;
+}
+.pending-building-clear:hover { background: var(--paper-sunk); border-color: var(--ink-40);
+}
+
 .sheet-actions {
   display: flex; justify-content: flex-end; gap: 9px;
   padding: 13px 18px; border-top: 1px solid var(--ink-15); background: var(--paper-raised);
@@ -631,42 +647,21 @@ select { font-family: var(--sans); }
 
 .intro-mark { position: relative; z-index: 2; text-align: center; padding: 0 24px; }
 
-.intro-word {
-  margin: 0;
-  display: flex;
-  justify-content: center;
-  gap: clamp(6px, 1.6vw, 18px);
-  font-weight: 700;
-  font-size: clamp(3rem, 13vw, 9rem);
-  line-height: 1;
-  letter-spacing: 0.06em;
-}
-.intro-word span {
-  display: inline-block;
+/* The wordmark + tagline lockup as one image (see weave-wordmark-dark.png) —
+   replaces what used to be a per-letter animated heading plus a separate
+   rule and tagline line, now that the tagline is baked into the artwork
+   itself rather than kept as a second, separately-styled element. */
+.intro-logo {
+  display: block;
+  margin: 0 auto;
+  width: min(620px, 72vw);
+  height: auto;
   opacity: 0;
-  transform: translateY(0.32em);
-  animation: letter-rise 760ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  transform: translateY(0.3em);
+  animation: intro-logo-rise 820ms cubic-bezier(0.2, 0.8, 0.2, 1) 140ms forwards;
 }
-@keyframes letter-rise {
+@keyframes intro-logo-rise {
   to { opacity: 1; transform: translateY(0); }
-}
-
-.intro-rule {
-  height: 2px;
-  margin: clamp(14px, 2.4vw, 26px) auto 0;
-  width: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
-  animation: rule-open 900ms 620ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-}
-@keyframes rule-open { to { width: min(430px, 78vw); } }
-
-.intro-sub {
-  margin: 16px 0 0;
-  font-size: clamp(0.82rem, 1.7vw, 1rem);
-  color: rgba(255, 255, 255, 0.55);
-  letter-spacing: 0.05em;
-  opacity: 0;
-  animation: fade-in 700ms 900ms ease forwards;
 }
 @keyframes fade-in { to { opacity: 1; } }
 
@@ -685,7 +680,7 @@ select { font-family: var(--sans); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .intro-word span, .intro-rule, .intro-sub, .intro-skip { animation-duration: 1ms; }
+  .intro-logo, .intro-skip { animation-duration: 1ms; }
 }
 
 /* ── menu ───────────────────────────────────────────────────────────────── */
@@ -699,9 +694,28 @@ select { font-family: var(--sans); }
   animation: fade-in 420ms ease both;
 }
 
+/* Right half only — the wheel (side="left") never draws there, so this is
+   the one part of the screen with nothing else animating on top of it.
+   Spans the full column height and reaches left to roughly screen-centre,
+   matching the MenuFlow curves' own viewBox (0 0 700 1000) with
+   preserveAspectRatio="none", so the sweep they're authored to draw — low
+   and centre-ish up to the top-right corner — lands where it's drawn to
+   land rather than wherever a fixed, reused curve happens to cross.
+   pointer-events: none (inherited from .fp-layer) so a drag that strays
+   over it still reaches the wheel underneath, not this. */
+.menu-fp {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 68%;
+  z-index: 1;
+  pointer-events: none;
+}
+
 .menu-head { position: absolute; top: 26px; left: 34px; z-index: 3; }
-.glyph-light { border-color: #fff !important; }
-.glyph-light::after { border-top-color: rgba(255, 255, 255, 0.7) !important; }
+.menu-head .wordmark-img { height: 22px;
+}
 
 .menu-help {
   position: absolute;
@@ -744,6 +758,9 @@ select { font-family: var(--sans); }
   border-bottom: 1px solid var(--ink-15);
 }
 .page p { line-height: 1.68; margin: 0 0 12px; }
+.page ol, .page ul { line-height: 1.68; margin: 0 0 16px; padding-left: 22px; }
+.page li { margin-bottom: 9px; }
+.page li:last-child { margin-bottom: 0; }
 
 .sample-banner {
   padding: 12px 15px;
@@ -797,18 +814,10 @@ select { font-family: var(--sans); }
 }
 .next-up p { margin: 0; font-size: 13px; color: var(--ink-60); }
 
-.method-table { display: flex; flex-direction: column; gap: 1px; background: var(--ink-15); border: 1px solid var(--ink-15); }
-.method-row { background: var(--paper); padding: 12px 14px; }
-.method-name { font-weight: 600; font-size: 13.5px; margin-bottom: 4px; }
-.method-nums { display: flex; gap: 18px; font-family: var(--mono); font-size: 12.5px; margin-bottom: 5px; }
-.method-src { font-size: 11px; color: var(--ink-40); font-family: var(--mono); line-height: 1.45; }
-
 .wordmark-btn {
   border: 0; background: none; padding: 0;
-  font: inherit; letter-spacing: 0.13em; text-transform: uppercase;
-  color: inherit; cursor: pointer;
+  font: inherit; color: inherit; cursor: pointer;
 }
-.wordmark-btn:hover .glyph { border-color: var(--emerald); }
 
 /* ── suggestion card ────────────────────────────────────────────────────── */
 

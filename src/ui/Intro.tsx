@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FloatingPathsBackground } from './FloatingPaths';
+import weaveWordmarkDark from '../assets/weave-wordmark-dark.png';
 
 interface Props {
   onDone(): void;
@@ -40,15 +41,13 @@ export function Intro({ onDone }: Props) {
       <FloatingPathsBackground position={-1} count={16} />
 
       <div className="intro-mark">
-        <h1 className="intro-word" aria-label="Weave">
-          {'WEAVE'.split('').map((c, i) => (
-            <span key={i} style={{ animationDelay: `${140 + i * 85}ms` }}>
-              {c}
-            </span>
-          ))}
+        <h1 style={{ margin: 0 }}>
+          <img
+            src={weaveWordmarkDark}
+            alt="Weave — connecting the threads that build communities"
+            className="intro-logo"
+          />
         </h1>
-        <div className="intro-rule" />
-        <p className="intro-sub">Connecting the threads that build communities</p>
       </div>
 
       <p className="intro-skip">Click anywhere to skip</p>

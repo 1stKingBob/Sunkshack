@@ -6,7 +6,7 @@ import { haversineMeters, formatDistance } from '../lib/distance';
 import { googleMapsConfigured } from '../lib/googleMaps';
 import { searchPlaces, toCandidate } from '../lib/placesSearch';
 import { supabaseConfigured } from '../lib/supabase';
-import type { PlaceCandidate } from '../types';
+import type { Building, PlaceCandidate } from '../types';
 
 // Sydney CBD / The Rocks — a fallback only, for when geolocation is denied,
 // unsupported, or times out. Matches the AS 1428.1 figures this project ships
@@ -18,7 +18,7 @@ function accessTier(accessible: boolean | null): 'good' | 'bad' | 'none' {
   return accessible ? 'good' : 'bad';
 }
 
-export function MapPage() {
+export function MapPage({ onCheckRoom }: { onCheckRoom(building: Building): void }) {
   const [center, setCenter] = useState(DEFAULT_CENTER);
   const [query, setQuery] = useState('restaurants');
   const [accessibleOnly, setAccessibleOnly] = useState(false);
@@ -177,7 +177,9 @@ export function MapPage() {
             mapRef.current = map;
           }}
         />
-        {selected && <BuildingPanel place={selected} onClose={() => setSelectedId(null)} />}
+        {selected && (
+          <BuildingPanel place={selected} onClose={() => setSelectedId(null)} onCheckRoom={onCheckRoom} />
+        )}
       </div>
     </div>
   );

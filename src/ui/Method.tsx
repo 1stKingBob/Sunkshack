@@ -1,96 +1,93 @@
-import { PROFILES } from '../profiles';
-import { formatLength, type UnitSystem } from '../units';
-
 /**
- * The method page — where the figures come from, how the maths works, and what
- * the tool does not claim. If a judge or a user wants to know whether to trust
- * a number, this is the page that answers it.
+ * The guide page — how to actually use the two halves of the app: checking a
+ * room on the Dashboard, and finding or publishing real places on Community.
+ * Reachable from the menu wheel and from the "Method" view key in App.tsx —
+ * kept as-is internally, only what's shown changed.
  */
-export function Method({ units }: { units: UnitSystem }) {
+export function Method() {
   return (
     <div className="page">
       <div className="page-inner">
-        <h1 className="page-title">Method &amp; standards</h1>
+        <h1 className="page-title">How to use Weave</h1>
         <p className="page-lede">
-          Weave reports measurements someone may act on, so every figure it uses is sourced and
-          every approximation it makes is stated. Nothing here is a number we invented.
+          Weave has two parts. The <strong>Dashboard</strong> checks whether one specific room works
+          for someone using a wheelchair or a walker. <strong>Community</strong> shows what other
+          people found when they checked real, nearby places — and lets you publish your own.
         </p>
 
-        <h2 className="page-h2">The figures</h2>
-        <div className="method-table">
-          {PROFILES.map((p) => (
-            <div className="method-row" key={p.id}>
-              <div className="method-name">{p.name}</div>
-              <div className="method-nums">
-                <span>route ≥ {formatLength(p.minPathWidth, units)}</span>
-                <span>turning ⌀ {formatLength(p.turningDiameter, units)}</span>
-              </div>
-              <div className="method-src">{p.source}</div>
-            </div>
-          ))}
-        </div>
+        <h2 className="page-h2">Dashboard — checking a room</h2>
+        <ol>
+          <li>
+            Set the room's <strong>width and depth</strong>, in millimetres. This is the one
+            measurement Weave takes as fact — everything else is scaled against it.
+          </li>
+          <li>
+            Add furniture. Drag pieces in from the panel on the left, or use{' '}
+            <strong>Upload photos</strong> / <strong>Take a photo</strong> and let it place them for
+            you — positions from a photo are estimates until you drag a piece to confirm it.
+          </li>
+          <li>
+            Mark the door as the <strong>entry</strong> point, then add a{' '}
+            <strong>destination</strong> for everywhere someone actually needs to reach — the bed,
+            a window, a desk. A room can have plenty of open floor and still fail if that floor
+            isn't between the door and the places that matter.
+          </li>
+          <li>
+            Pick <strong>who it's for</strong> from the profile dropdown — a manual wheelchair or
+            two passing under AS 1428.1, a wheelchair under the ADA, or a walker/rollator. Each
+            profile carries its own minimum route width and turning circle.
+          </li>
+          <li>
+            Read the <strong>Findings</strong> panel. Each route and the turning circle show pass
+            or fail with the exact measurement and, if it fails, exactly how far short it is. On a
+            small screen, tap the <strong>▾</strong> in its header to collapse it and see the room
+            underneath.
+          </li>
+          <li>
+            If something fails, tap <strong>Suggest a fix</strong> for the smallest furniture move
+            that clears it with real margin to spare — not just a bare pass. A dashed outline shows
+            where the piece would go; <strong>Apply</strong> it or <strong>Dismiss</strong> the
+            suggestion.
+          </li>
+          <li>
+            Tap <strong>Generate Care Pass</strong> for a shareable summary of the check. Export it
+            to publish the room to Community, or to keep as a record.
+          </li>
+        </ol>
 
-        <h2 className="page-h2">One field, two checks</h2>
-        <p>
-          Everything reads off a single precomputed field: for every point in the room, how much
-          free space surrounds it. Someone can <em>turn</em> at a point exactly when that point's
-          clearance is at least their turning radius. A <em>route</em> of width W exists exactly
-          when there is a connected chain of points whose clearance never drops below W/2. These
-          are not two systems — they are two reads of the same field, which is why the whole check
-          re-runs in single-digit milliseconds and can run on every frame while you drag.
-        </p>
+        <h2 className="page-h2">Community — finding and publishing real places</h2>
+        <ol>
+          <li>Open Community from the menu, and search for a restaurant, building, or address.</li>
+          <li>
+            Each result shows <strong>Accessible</strong>, <strong>Not accessible</strong>, or{' '}
+            <strong>—</strong> if nobody has checked it yet. That badge only reads Accessible if
+            every submitted report clears the required figures with real margin — a room that just
+            barely meets the code minimum doesn't count.
+          </li>
+          <li>
+            Tap a result to see its location on the map, its address, and every report submitted
+            for it. Tick <strong>Wheelchair accessible only</strong> to filter the list.
+          </li>
+          <li>
+            Tap <strong>Add an accessibility report</strong> to publish your own — upload the Care
+            Pass file you exported from the Dashboard, pick the building, and submit.
+          </li>
+        </ol>
 
-        <h2 className="page-h2">Measurements are analytic, not counted</h2>
-        <p>
-          Clearance is computed in closed form — exact point-to-rectangle distance — rather than by
-          counting grid cells. A rasterised distance transform has to round furniture outward to
-          whole cells and correct back by half a cell, and those two errors do not cancel: on a
-          50 mm grid it under-reported a real 735 mm gap as 650 mm. For a tool whose entire claim
-          is that it gives you the actual number, an 85 mm systematic error in the headline figure
-          is not a rounding detail. The grid still exists — the route search walks over it — but
-          its resolution only affects how finely a path can bend, not what any measurement says.
-        </p>
-
-        <h2 className="page-h2">Routes are widest-path, then shortest</h2>
-        <p>
-          When a room fails, “there is no route” is useless. The search maximises the minimum
-          clearance along the way, so it returns the best route that exists and the exact width of
-          its narrowest point — the number that tells you whether to move the wardrobe 300 mm or
-          rethink the room. A second pass then finds the shortest route among those achieving that
-          same width, so the line drawn on the plan is one a person would actually take.
-        </p>
-
-        <h2 className="page-h2">Why doorways are exempt</h2>
-        <p>
-          An anchor is somewhere you are trying to arrive at — a doorway, the side of a bed — and
-          arriving anywhere means approaching a wall or an object, so clearance at those points is
-          near zero by construction. Measuring corridor width across a doorway would fail every
-          room ever built. AS 1428.1 reflects this directly: a doorway carries its own clear-width
-          figure, deliberately smaller than the figure required of a circulation route. Points
-          within the turning radius of an anchor are therefore exempt from the width test — in both
-          the search and the measurement, using one shared mask so the two cannot disagree.
-        </p>
-
-        <h2 className="page-h2">Colour is never the only signal</h2>
-        <p>
-          The crimson used for failures and the emerald used for passes sit at a contrast ratio of
-          1.27:1 against each other. They differ almost purely in hue, which is the one axis a
-          red–green colourblind viewer cannot use. So failures are hatched and passes are solid,
-          the measurement is always printed alongside, and the wheelchair is blue — the axis that
-          survives. An accessibility tool that could only be read by some people would be a poor
-          joke.
-        </p>
-
-        <h2 className="page-h2">What this is not</h2>
-        <div className="disclaimer" style={{ marginTop: 8 }}>
-          Weave checks the layout you gave it against the figures you selected. It is not a
-          certification and not a full accessibility assessment: it says nothing about doorway
-          hardware, floor surfaces, thresholds, lighting, reach ranges, or anything outside the
-          room being checked. Positions derived from a photograph are estimates scaled by the room
-          width you typed, and are marked as estimates until you confirm them. The interface never
-          claims compliance with a code — it reports whether a layout meets the clearance settings
-          in force for that check.
-        </div>
+        <h2 className="page-h2">A couple of things worth knowing</h2>
+        <ul>
+          <li>The <strong>mm / ft·in</strong> toggle, top right, switches units everywhere at once.</li>
+          <li>
+            Photo analysis and the Community map both need an API key to work live. Without one,
+            the Dashboard falls back to manual placement and Community falls back to a sample list
+            — both say so rather than showing a blank screen.
+          </li>
+          <li>
+            Weave checks the layout you gave it against the figures you selected. It isn't a
+            certification: it says nothing about doorway hardware, floor surfaces, thresholds,
+            lighting, or reach ranges.
+          </li>
+        </ul>
       </div>
     </div>
   );

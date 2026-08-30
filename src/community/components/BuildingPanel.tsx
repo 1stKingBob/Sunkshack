@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 import { fetchReportsForPlace } from '../lib/supabase';
 import { goToUpload } from '../lib/router';
-import type { PlaceCandidate, StoredReport } from '../types';
+import type { Building, PlaceCandidate, StoredReport } from '../types';
 import { formatDistance } from '../lib/distance';
 
 interface Props {
   place: PlaceCandidate;
   onClose(): void;
+  /** Jumps straight into the Dashboard to check this room, with this building carried along to publish against. */
+  onCheckRoom(building: Building): void;
 }
 
-export function BuildingPanel({ place, onClose }: Props) {
+export function BuildingPanel({ place, onClose, onCheckRoom }: Props) {
   const [reports, setReports] = useState<StoredReport[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -97,8 +99,28 @@ export function BuildingPanel({ place, onClose }: Props) {
       </div>
 
       <div className="building-panel-actions">
-        <button className="btn primary" style={{ width: '100%' }} onClick={() => goToUpload(place.placeId)}>
-          Add an accessibility report
+        <button
+          className="btn primary"
+          style={{ width: '100%' }}
+          onClick={() =>
+            onCheckRoom({
+              placeId: place.placeId,
+              name: place.name,
+              address: place.address,
+              lat: place.lat,
+              lng: place.lng,
+              category: place.category,
+            })
+          }
+        >
+          Check this room →
+        </button>
+        <button
+          className="btn-link"
+          style={{ display: 'block', width: '100%', textAlign: 'center', marginTop: 8, fontSize: 12 }}
+          onClick={() => goToUpload(place.placeId)}
+        >
+          or upload a report you already exported
         </button>
       </div>
     </div>

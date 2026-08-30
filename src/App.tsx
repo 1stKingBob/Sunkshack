@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import weaveMarkLight from './assets/weave-mark-light.png';
 import type { AnchorPoint, FurnitureItem, FurnitureType, Room } from './types';
 import { checkClearance } from './engine/clearance';
 import { applySuggestion, suggestFix, type Suggestion } from './engine/suggest';
@@ -14,6 +15,8 @@ import { CarePass, buildReport, encodeReport } from './ui/CarePass';
 import { Intro } from './ui/Intro';
 import { Menu, type Destination } from './ui/Menu';
 import { CommunityApp } from './community/CommunityApp';
+import { goToMap } from './community/lib/router';
+import type { Building } from './community/types';
 import { Method } from './ui/Method';
 
 type View = 'intro' | 'menu' | 'dashboard' | 'community' | 'method';
@@ -60,6 +63,11 @@ export default function App() {
   const [passOpen, setPassOpen] = useState(false);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [suggesting, setSuggesting] = useState(false);
+  // Set when Community's "Check this room" hands off a specific building —
+  // carries across the Dashboard visit so Publish knows which place to
+  // attach the finished report to, instead of asking the user to search for
+  // it again on the other side.
+  const [pendingBuilding, setPendingBuilding] = useState<Building | null>(null);
 
   const profile = getProfile(profileId);
 
@@ -192,7 +200,20 @@ export default function App() {
         if (outcome.furniture.length > 0) {
           setRoom((r) => ({ ...r, furniture: outcome.furniture }));
         }
-        setPhotoNotes(outcome.warnings);
+        const warnings = [...outcome.warnings];
+        // A photo carries no scale — furniture is placed as a fraction of
+        // whatever's in Width/Depth right now. Both starting presets default
+        // to the same 3400 × 5200, so a room still at that figure almost
+        // certainly hasn't been set to this room's real size, and the
+        // placement above is about to look proportionally wrong: a bed
+        // genuinely against a narrower wall lands away from it instead.
+        if (room.width === EMPTY_ROOM.width && room.depth === EMPTY_ROOM.depth) {
+          warnings.unshift(
+            `Placed against ${room.width} × ${room.depth} mm — that's still the default. If ` +
+              "that isn't this room's real size, set Width/Depth above to match and upload again.",
+          );
+        }
+        setPhotoNotes(warnings);
       } catch (err) {
         setPhotoNotes([`Could not read those images: ${(err as Error).message}`]);
       } finally {
@@ -238,7 +259,16 @@ export default function App() {
 
   const go = useCallback((d: Destination) => {
     if (d === 'exit') setView('intro');
-    else setView(d);
+    else {
+      // CommunityApp's hash route (#/upload...) is its own internal state and
+      // outlives leaving the screen — nothing ever reset it, so the next time
+      // you arrived here from the menu you'd land back on whatever sub-page
+      // you last visited (usually "Add an accessibility report") instead of
+      // the map. The menu is the only way into this view from the top level,
+      // so every arrival here should be a fresh one.
+      if (d === 'community') goToMap();
+      setView(d);
+    }
   }, []);
 
   if (view === 'intro') return <Intro onDone={() => setView('menu')} />;
@@ -249,15 +279,24 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <button className="wordmark wordmark-btn" onClick={() => setView('intro')} title="Back to start">
-          <span className="glyph" />
-          Weave
+        <button
+          className="wordmark-btn"
+          onClick={() => {
+            // Leaving without publishing — the building this Dashboard visit
+            // was earmarked for shouldn't silently attach to some later,
+            // unrelated check.
+            setPendingBuilding(null);
+            setView('intro');
+          }}
+          title="Back to start"
+        >
+          <img src={weaveMarkLight} alt="Weave" className="wordmark-img" />
         </button>
         <span className="tagline">
           {view === 'community'
             ? 'Places people have measured'
             : view === 'method'
-              ? 'Method & standards'
+              ? 'How to use Weave'
               : 'Connecting the threads that build communities'}
         </span>
         <div className="spacer" />
@@ -278,8 +317,33 @@ export default function App() {
         )}
       </header>
 
-      {view === 'community' && <CommunityApp units={units} />}
-      {view === 'method' && <Method units={units} />}
+      {view === 'community' && (
+        <CommunityApp
+          units={units}
+          onCheckRoom={(building) => {
+            setPendingBuilding(building);
+            setView('dashboard');
+          }}
+        />
+      )}
+      {view === 'method' && <Method />}
+
+      {view === 'dashboard' && pendingBuilding && (
+        <div className="pending-building">
+          <span>
+            Checking this room for <strong>{pendingBuilding.name}</strong> — publish the Care Pass
+            when you're done and it'll attach straight to this place.
+          </span>
+          <button
+            className="pending-building-clear"
+            onClick={() => setPendingBuilding(null)}
+            aria-label="Not this building"
+            title="Not this building"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {view === 'dashboard' && (
         <div className="body">
@@ -380,9 +444,18 @@ export default function App() {
             // Hand the finished check to the Community screen through the URL
             // fragment its upload page already reads, so the two halves stay
             // decoupled — Community accepts a report, not this app's state.
-            window.location.hash = `/upload?report=${encodeURIComponent(
+            // If this visit was earmarked for a specific building (Community's
+            // "Check this room"), carry its place id along too, so Upload
+            // arrives with both the report and the building pre-filled and
+            // there's nothing left to search for on the other side.
+            const reportParam = `report=${encodeURIComponent(
               encodeReport(buildReport(room, result, profile)),
             )}`;
+            const placeParam = pendingBuilding
+              ? `place=${encodeURIComponent(pendingBuilding.placeId)}&`
+              : '';
+            window.location.hash = `/upload?${placeParam}${reportParam}`;
+            setPendingBuilding(null);
             setPassOpen(false);
             setView('community');
           }}

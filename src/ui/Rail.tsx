@@ -152,9 +152,9 @@ export function Rail(p: Props) {
           Take a photo
         </button>
         <p className="hint">
-          Several angles work better than one — a single frame cannot show what is behind the
-          camera. Up to four are used. The photo tells us what is in the room and roughly where;
-          it never sets a size.
+          Set the room's real width and depth above <strong>before</strong> uploading — a photo has
+          no scale of its own, so whatever is in those two fields is what everything below gets
+          placed against. Several angles work better than one; up to four are used.
         </p>
         {p.photoNotes.map((n, i) => (
           <p className="hint warn" key={i}>{n}</p>

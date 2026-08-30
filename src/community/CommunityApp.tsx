@@ -5,6 +5,7 @@ import { MapPage } from './pages/MapPage';
 import { UploadPage } from './pages/UploadPage';
 import { SampleList } from './SampleList';
 import type { UnitSystem } from '../units';
+import type { Building } from './types';
 import './community.css';
 
 /**
@@ -28,7 +29,13 @@ import './community.css';
  * an entry is. The banner there says plainly that the live map is off and what
  * would turn it on.
  */
-export function CommunityApp({ units }: { units: UnitSystem }) {
+export function CommunityApp({
+  units,
+  onCheckRoom,
+}: {
+  units: UnitSystem;
+  onCheckRoom(building: Building): void;
+}) {
   const route = useHashRoute();
 
   // The map is the whole screen; without it there is nothing to show.
@@ -46,7 +53,7 @@ export function CommunityApp({ units }: { units: UnitSystem }) {
       {route.name === 'upload' ? (
         <UploadPage placeIdParam={route.placeId} reportParam={route.report} />
       ) : (
-        <MapPage />
+        <MapPage onCheckRoom={onCheckRoom} />
       )}
     </div>
   );
